@@ -4,9 +4,6 @@ export const dashboardApi = api.injectEndpoints({
         getSummary: builder.query({
             query: (employeeId) => `/dashboard/summary?employeeId=${employeeId}`,
         }),
-        getLiveActivity: builder.query({
-            query: () => '/dashboard/live-activity',
-        }),
         getUrgentActions: builder.query({
             query: (employeeId) => `/dashboard/urgent-actions?employeeId=${employeeId}`,
         }),
@@ -15,4 +12,4 @@ export const dashboardApi = api.injectEndpoints({
         }),
     }),
 });
-export const { useGetSummaryQuery, useGetLiveActivityQuery, useGetUrgentActionsQuery, useGetNearbyOpportunitiesQuery } = dashboardApi;
+export const { useGetSummaryQuery, useGetUrgentActionsQuery, useGetNearbyOpportunitiesQuery } = dashboardApi;

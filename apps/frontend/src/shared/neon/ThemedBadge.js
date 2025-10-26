@@ -6,31 +6,34 @@ export function ThemedBadge({ children, className = '' }) {
         if (currentTheme.isNeon) {
             // Dark Neon Theme
             return [
-                'relative inline-flex items-center justify-center px-4 py-2 rounded-xl',
-                'text-[13px] font-bold tracking-wider uppercase',
+                'relative inline-flex items-center justify-center px-3 py-1.5 rounded-lg',
+                'text-xs font-bold tracking-wide uppercase',
                 'text-[var(--text)]/90',
                 'bg-white/5',
-                'ring-1 ring-white/15'
+                'ring-1 ring-white/15',
+                'whitespace-nowrap'
             ].join(' ');
         }
         else if (currentTheme.isDark) {
             // Dark Theme
             return [
-                'relative inline-flex items-center justify-center px-4 py-2 rounded-xl',
-                'text-[13px] font-bold tracking-wider uppercase',
+                'relative inline-flex items-center justify-center px-3 py-1.5 rounded-lg',
+                'text-xs font-bold tracking-wide uppercase',
                 'text-white/90',
                 'bg-white/5',
-                'ring-1 ring-white/15'
+                'ring-1 ring-white/15',
+                'whitespace-nowrap'
             ].join(' ');
         }
         else {
             // Light Theme
             return [
-                'relative inline-flex items-center justify-center px-4 py-2 rounded-xl',
-                'text-[13px] font-bold tracking-wider uppercase',
+                'relative inline-flex items-center justify-center px-3 py-1.5 rounded-lg',
+                'text-xs font-bold tracking-wide uppercase',
                 'text-gray-900',
                 'bg-amber-100',
-                'ring-1 ring-amber-200'
+                'ring-1 ring-amber-200',
+                'whitespace-nowrap'
             ].join(' ');
         }
     };

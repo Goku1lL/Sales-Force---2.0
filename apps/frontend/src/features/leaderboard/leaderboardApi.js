@@ -16,6 +16,10 @@ export const leaderboardApi = api.injectEndpoints({
             query: (employeeId) => `/leaderboard/profile/${employeeId}`,
             transformResponse: (resp) => resp?.data ?? null,
         }),
+        getEmployeeDetails: builder.query({
+            query: (employeeId) => `/leaderboard/employee-details/${employeeId}`,
+            transformResponse: (resp) => resp?.data ?? null,
+        }),
     }),
 });
-export const { useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery, useGetMyRankQuery, useGetUserProfileQuery } = leaderboardApi;
+export const { useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery, useGetMyRankQuery, useGetUserProfileQuery, useGetEmployeeDetailsQuery } = leaderboardApi;
