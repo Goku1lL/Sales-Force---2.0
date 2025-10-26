@@ -11,13 +11,6 @@ export const getPrisma = () => {
         },
       },
       log: ['error', 'warn'],
-      // Add connection pool configuration
-      __internal: {
-        engine: {
-          connectionTimeout: 60000, // 60 seconds
-          poolTimeout: 60000, // 60 seconds
-        },
-      },
     });
   }
   return prisma;
