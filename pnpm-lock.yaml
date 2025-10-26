@@ -83,6 +83,9 @@ importers:
       '@vercel/node':
         specifier: ^3.0.0
         version: 3.2.29
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
       react:
         specifier: ^18.3.1
         version: 18.3.1
