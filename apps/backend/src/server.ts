@@ -25,11 +25,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// Only start realtime in development to save memory in production
-// TODO: Re-enable after confirming Render memory limits
-if (process.env.NODE_ENV !== 'production') {
-  startRealtime(io);
-}
+// Start realtime publisher (optimized for client-aware polling)
+startRealtime(io);
 
 server.listen(port, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
