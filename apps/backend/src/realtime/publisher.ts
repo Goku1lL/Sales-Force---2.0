@@ -2,30 +2,25 @@ import { Server as IOServer } from 'socket.io';
 import { getPrisma } from '../lib/prisma';
 
 export function startRealtime(io: IOServer) {
-  let activeClients = 0;
-  let lastActivityTime = Date.now();
+  // Only start realtime features if there are connected clients
+  let hasClients = false;
   
   io.on('connection', () => {
-    activeClients++;
-    lastActivityTime = Date.now();
+    hasClients = true;
   });
 
   io.on('disconnect', () => {
-    activeClients = io.engine.clientsCount || 0;
-    lastActivityTime = Date.now();
+    hasClients = io.engine.clientsCount > 0;
   });
 
-  // Live activity every 60s (only if clients connected)
-  const liveActivityInterval = setInterval(async () => {
-    // Skip if no clients or been inactive for 5 minutes
-    if (activeClients === 0 || Date.now() - lastActivityTime > 300000) {
-      return;
-    }
+  // Live activity every 30s (increased frequency for better real-time feel)
+  setInterval(async () => {
+    if (!hasClients) return; // Skip if no clients connected
     
     try {
       const prisma = (await import('../lib/prisma')).getPrisma();
 
-      // Get recent sales achievements from today (reduced limit for memory)
+      // Get recent sales achievements from today (reduced limit)
       const today = new Date().toISOString().slice(0, 10);
 
       const recentAchievements = await prisma.$queryRawUnsafe<any[]>(`
@@ -45,7 +40,7 @@ export function startRealtime(io: IOServer) {
           AND da.Achievement > 0
           AND da.deleted = 0
         ORDER BY da.date DESC, da.Achievement DESC
-        LIMIT 3
+        LIMIT 5
       `, today);
 
       // Format the activities for real-time emission
@@ -69,12 +64,11 @@ export function startRealtime(io: IOServer) {
       console.error('Error in live activity publisher:', error);
       // ignore transient errors
     }
-  }, 60000);
+  }, 30000); // Reduced interval to 30s
 
-  // Urgent actions every 120s
-  const urgentActionsInterval = setInterval(async () => {
-    // Skip if no clients
-    if (activeClients === 0) return;
+  // Urgent actions every 120s (reduced frequency)
+  setInterval(async () => {
+    if (!hasClients) return; // Skip if no clients connected
     
     try {
       // For now, emit empty data since we don't have direct employee-customer relationship
@@ -82,11 +76,5 @@ export function startRealtime(io: IOServer) {
     } catch {
       // ignore
     }
-  }, 120000);
-
-  // Cleanup intervals on server shutdown
-  process.on('SIGTERM', () => {
-    clearInterval(liveActivityInterval);
-    clearInterval(urgentActionsInterval);
-  });
+  }, 120000); // Increased interval to 120s
 }
