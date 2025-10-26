@@ -25,7 +25,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start realtime publisher (optimized for memory efficiency)
+// Start realtime publisher (optimized for client-aware polling)
 startRealtime(io);
 
 server.listen(port, '0.0.0.0', () => {
