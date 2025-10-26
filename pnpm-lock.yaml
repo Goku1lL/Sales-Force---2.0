@@ -11,6 +11,9 @@ importers:
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.23
       '@vercel/node':
         specifier: ^3.0.0
         version: 3.2.29
@@ -26,6 +29,9 @@ importers:
       prisma:
         specifier: ^5.22.0
         version: 5.22.0
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
     devDependencies:
       '@types/bcrypt':
         specifier: ^5.0.2
@@ -33,15 +39,9 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.6
         version: 9.0.10
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.23
       '@types/nodemailer':
         specifier: ^7.0.2
         version: 7.0.2
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
 
   apps/backend:
     dependencies:

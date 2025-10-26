@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd apps/backend && npx prisma generate && cd ../.. && pnpm install && pnpm run build",
+  "buildCommand": "npx prisma generate && pnpm install && pnpm run build",
   "outputDirectory": "apps/frontend/dist",
   "framework": "vite",
   "rewrites": [
