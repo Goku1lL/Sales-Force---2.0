@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm -r --filter ./apps/* dev",
     "build": "pnpm -r --filter ./apps/* build",
+    "start": "pnpm --filter @sfa/backend start",
     "lint": "echo \"No lint at root\""
   }
 }
