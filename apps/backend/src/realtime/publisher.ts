@@ -2,12 +2,25 @@ import { Server as IOServer } from 'socket.io';
 import { getPrisma } from '../lib/prisma';
 
 export function startRealtime(io: IOServer) {
-  // Live activity every 30s - now enabled with actual achievement data
+  // Only start realtime features if there are connected clients
+  let hasClients = false;
+  
+  io.on('connection', () => {
+    hasClients = true;
+  });
+
+  io.on('disconnect', () => {
+    hasClients = io.engine.clientsCount > 0;
+  });
+
+  // Live activity every 60s (reduced frequency to save memory)
   setInterval(async () => {
+    if (!hasClients) return; // Skip if no clients connected
+    
     try {
       const prisma = (await import('../lib/prisma')).getPrisma();
 
-      // Get recent sales achievements from today
+      // Get recent sales achievements from today (reduced limit)
       const today = new Date().toISOString().slice(0, 10);
 
       const recentAchievements = await prisma.$queryRawUnsafe<any[]>(`
@@ -27,7 +40,7 @@ export function startRealtime(io: IOServer) {
           AND da.Achievement > 0
           AND da.deleted = 0
         ORDER BY da.date DESC, da.Achievement DESC
-        LIMIT 10
+        LIMIT 5
       `, today);
 
       // Format the activities for real-time emission
@@ -51,15 +64,17 @@ export function startRealtime(io: IOServer) {
       console.error('Error in live activity publisher:', error);
       // ignore transient errors
     }
-  }, 30000);
+  }, 60000); // Increased interval to 60s
 
-  // Urgent actions every 60s - disabled for now since we don't have proper employee-customer relationships
+  // Urgent actions every 120s (reduced frequency)
   setInterval(async () => {
+    if (!hasClients) return; // Skip if no clients connected
+    
     try {
       // For now, emit empty data since we don't have direct employee-customer relationship
       io.emit('urgent:action', []);
     } catch {
       // ignore
     }
-  }, 60000);
+  }, 120000); // Increased interval to 120s
 }

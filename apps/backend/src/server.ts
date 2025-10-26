@@ -25,9 +25,12 @@ io.on('connection', (socket) => {
   });
 });
 
-startRealtime(io);
+// Only start realtime in development to save memory in production
+if (process.env.NODE_ENV !== 'production') {
+  startRealtime(io);
+}
 
-server.listen(port, () => {
+server.listen(port, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
-  console.log(`API listening on http://localhost:${port}`);
+  console.log(`API listening on http://0.0.0.0:${port}`);
 });
