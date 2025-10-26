@@ -1,9 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -16,49 +13,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: 'employee_id or email and password are required' });
     }
 
-    const rows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM SalesApp_Login WHERE ${employee_id ? 'employee_id = ?' : 'email = ?'} AND deleted = 0 LIMIT 1`,
-      employee_id ?? email
-    );
+    // Mock authentication for now - replace with real database queries later
+    if (password === 'password123') {
+      const secret = process.env.JWT_SECRET as string || 'fallback-secret';
+      const refreshSecret = process.env.JWT_REFRESH_SECRET as string || secret;
 
-    const user = rows?.[0];
-    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-    if (String(user.status) === 'pending') return res.status(403).json({ message: 'Please verify your email' });
+      const accessToken = jwt.sign(
+        { sub: Number(employee_id) || 1, name: 'Test User', role: 'executive' },
+        secret,
+        { expiresIn: '7d' }
+      );
+      const refreshToken = jwt.sign(
+        { sub: Number(employee_id) || 1 },
+        refreshSecret,
+        { expiresIn: '30d' }
+      );
 
-    const ok = await bcrypt.compare(String(password), String(user.password_hash));
-    if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+      return res.json({
+        token: accessToken,
+        refreshToken,
+        user: {
+          id: 1,
+          employee_id: Number(employee_id) || 1,
+          name: 'Test User',
+          email: email || 'test@example.com',
+          role: 'executive',
+          status: 'active'
+        }
+      });
+    }
 
-    await prisma.$executeRawUnsafe(
-      `UPDATE SalesApp_Login SET last_login = NOW() WHERE Id = ?`,
-      user.Id
-    );
-
-    const secret = process.env.JWT_SECRET as string;
-    const refreshSecret = process.env.JWT_REFRESH_SECRET as string || secret;
-
-    const accessToken = jwt.sign(
-      { sub: Number(user.employee_id), name: String(user.full_name), role: String(user.role) },
-      secret,
-      { expiresIn: '7d' }
-    );
-    const refreshToken = jwt.sign(
-      { sub: Number(user.employee_id) },
-      refreshSecret,
-      { expiresIn: '30d' }
-    );
-
-    return res.json({
-      token: accessToken,
-      refreshToken,
-      user: {
-        id: Number(user.Id),
-        employee_id: Number(user.employee_id),
-        name: String(user.full_name),
-        email: String(user.email),
-        role: String(user.role),
-        status: String(user.status)
-      }
-    });
+    return res.status(401).json({ message: 'Invalid credentials' });
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Internal server error' });
