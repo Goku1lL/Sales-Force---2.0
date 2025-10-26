@@ -1,5 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { prisma } from '../../lib/prisma';
+import { getPrisma } from '../_utils/prisma';
+import { requireAuth } from '../_utils/auth';
+import { handleError } from '../_utils/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -7,46 +9,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { cluster } = req.query;
+    const user = requireAuth(req, res);
+    if (!user) return; // Response already sent by requireAuth
+
+    const { cityId } = req.query;
+    const prisma = getPrisma();
     
-    if (!cluster) {
-      return res.status(400).json({ error: 'Cluster is required' });
+    if (!cityId) {
+      return res.status(400).json({ error: 'City ID is required' });
     }
 
-    // Get cluster leaderboard
+    // Get city leaderboard
     const leaderboard = await prisma.$queryRawUnsafe<any[]>(`
       SELECT 
         e.employee_id,
         e.Name,
-        e.cluster,
+        e.CityId,
+        c.city_name,
         SUM(da.Achievement) as weekly_achievements,
         ROW_NUMBER() OVER (ORDER BY SUM(da.Achievement) DESC) as rank
       FROM Executive e
       LEFT JOIN DayAchievement da ON e.employee_id = da.employee_id 
         AND da.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
         AND da.deleted = 0
-      WHERE e.cluster = ?
-      GROUP BY e.employee_id, e.Name, e.cluster
+      LEFT JOIN City c ON e.CityId = c.CityId
+      WHERE e.CityId = ?
+      GROUP BY e.employee_id, e.Name, e.CityId, c.city_name
       ORDER BY weekly_achievements DESC
       LIMIT 10
-    `, cluster);
+    `, cityId);
 
     res.status(200).json({
       success: true,
       data: leaderboard.map((item: any) => ({
         employee_id: item.employee_id,
         name: item.Name,
-        cluster: item.cluster,
+        city_id: item.CityId,
+        city_name: item.city_name,
         weekly_achievements: item.weekly_achievements || 0,
         rank: item.rank
       }))
     });
 
   } catch (error) {
-    console.error('Cluster leaderboard error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
+    return handleError(res, error);
   }
 }

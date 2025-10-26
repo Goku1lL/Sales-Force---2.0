@@ -1,5 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { prisma } from '../../lib/prisma';
+import { getPrisma } from '../_utils/prisma';
+import { requireAuth } from '../_utils/auth';
+import { handleError } from '../_utils/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -7,7 +9,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const user = requireAuth(req, res);
+    if (!user) return; // Response already sent by requireAuth
+
     const { employeeId } = req.query;
+    const prisma = getPrisma();
     
     if (!employeeId) {
       return res.status(400).json({ error: 'Employee ID is required' });
@@ -54,10 +60,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error) {
-    console.error('User profile error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
+    return handleError(res, error);
   }
 }
