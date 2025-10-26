@@ -5,8 +5,7 @@
       "src": "apps/frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "apps/frontend/dist",
-        "buildCommand": "pnpm --filter @sfa/frontend run vercel-build"
+        "distDir": "dist"
       }
     },
     {
@@ -21,7 +20,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/apps/frontend/dist/$1"
+      "dest": "/dist/$1"
     }
   ]
 }
