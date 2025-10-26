@@ -1,7 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -58,7 +56,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       success: false, 
       error: 'Internal server error' 
     });
-  } finally {
-    await prisma.$disconnect();
   }
 }
