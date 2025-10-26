@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { getPrisma } from '../_utils/prisma';
-import { handleError } from '../_utils/errors';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -15,7 +16,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: 'employee_id or email and password are required' });
     }
 
-    const prisma = getPrisma();
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM SalesApp_Login WHERE ${employee_id ? 'employee_id = ?' : 'email = ?'} AND deleted = 0 LIMIT 1`,
       employee_id ?? email
@@ -60,6 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     });
   } catch (error) {
-    return handleError(res, error);
+    console.error('Login error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -2,8 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
-import { getPrisma } from '../_utils/prisma';
-import { handleError } from '../_utils/errors';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 function getBaseUrl(req: VercelRequest) {
   const origin = req.headers['origin'] || 'http://localhost:3000';
@@ -31,7 +32,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: 'email, full_name, password required' });
     }
 
-    const prisma = getPrisma();
     const existing = await prisma.$queryRawUnsafe<any[]>(`SELECT Id FROM SalesApp_Login WHERE email = ? LIMIT 1`, email);
     if (existing.length) {
       return res.status(409).json({ message: 'Email already registered' });
@@ -59,6 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ message: 'Signup initiated. Check your email to verify.' });
   } catch (error) {
-    return handleError(res, error);
+    console.error('Signup error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
