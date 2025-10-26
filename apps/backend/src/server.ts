@@ -25,8 +25,15 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start realtime publisher (optimized for client-aware polling)
-startRealtime(io);
+// Only enable realtime features when clients are connected in production
+if (process.env.NODE_ENV !== 'production') {
+  startRealtime(io);
+} else {
+  // In production, only start realtime when clients connect
+  io.on('connection', () => {
+    startRealtime(io);
+  });
+}
 
 server.listen(port, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
