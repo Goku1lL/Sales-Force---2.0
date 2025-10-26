@@ -14,3 +14,16 @@ export function verifyToken(req: VercelRequest): { sub: number; role: string } |
     return null;
   }
 }
+
+export function unauthorized(res: any) {
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
+export function badRequest(res: any, message: string) {
+  return res.status(400).json({ error: message });
+}
+
+export function serverError(res: any, error: unknown) {
+  console.error('Server error:', error);
+  return res.status(500).json({ error: 'Internal server error' });
+}
