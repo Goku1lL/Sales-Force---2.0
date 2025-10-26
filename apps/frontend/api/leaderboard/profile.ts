@@ -59,7 +59,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       success: false, 
       error: 'Internal server error' 
     });
-  } finally {
-    await prisma.$disconnect();
   }
 }
