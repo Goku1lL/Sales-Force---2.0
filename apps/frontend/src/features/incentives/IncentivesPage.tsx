@@ -4,20 +4,20 @@ import type { RootState } from '../../app/store';
 import { useGetIncentiveBreakdownQuery, useGetDetailedDailyAchievementsQuery, useGetDetailedWeeklyAchievementsQuery } from './incentivesApi';
 
 export default function IncentivesPage() {
-  const employeeId = useSelector((s: RootState) => s.auth.user?.employee_id || 0);
+  const employeeId = useSelector((s: RootState) => s.auth.user?.employee_id);
   const [period, setPeriod] = useState<'daily' | 'weekly'>('weekly');
   const [showDetailed, setShowDetailed] = useState(false);
-  const { data, isLoading } = useGetIncentiveBreakdownQuery({ employeeId, period }, { skip: !employeeId });
+  const { data, isLoading } = useGetIncentiveBreakdownQuery({ employeeId: employeeId || 0, period }, { skip: !employeeId });
   
   // Detailed achievements with comprehensive SQL queries
   const today = new Date().toISOString().slice(0, 10);
   const yearweek = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) + 1970; // Simple yearweek calculation
   const { data: detailedDailyAchievements, isLoading: loadingDetailedDaily, error: errorDetailedDaily } = useGetDetailedDailyAchievementsQuery(
-    { employeeId, date: today }, 
+    { employeeId: employeeId || 0, date: today }, 
     { skip: !employeeId || !showDetailed || period !== 'daily' }
   );
   const { data: detailedWeeklyAchievements, isLoading: loadingDetailedWeekly, error: errorDetailedWeekly } = useGetDetailedWeeklyAchievementsQuery(
-    { employeeId, yearweek }, 
+    { employeeId: employeeId || 0, yearweek }, 
     { skip: !employeeId || !showDetailed || period !== 'weekly' }
   );
 

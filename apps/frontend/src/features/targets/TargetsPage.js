@@ -2,10 +2,13 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useSelector } from 'react-redux';
 import { useGetEmployeeDetailsQuery } from '../leaderboard/leaderboardApi';
 export default function TargetsPage() {
-    const user = useSelector((s) => s.auth.user);
-    const token = useSelector((s) => s.auth.token);
+    const { user, token } = useSelector((s) => s.auth);
     const employeeId = user?.employee_id;
-    const { data: employeeDetails, isLoading, error } = useGetEmployeeDetailsQuery(Number(employeeId) || 0, {
+    // Don't render anything if user is not authenticated
+    if (!token || !employeeId) {
+        return _jsx("div", { className: "p-4", children: "Please log in to view targets." });
+    }
+    const { data: employeeDetails, isLoading, error } = useGetEmployeeDetailsQuery(employeeId?.toString() || '', {
         skip: !employeeId
     });
     const formatCurrency = (amount) => {

@@ -17,7 +17,7 @@ export const leaderboardApi = api.injectEndpoints({
       query: (employeeId) => `/leaderboard/profile/${employeeId}`,
       transformResponse: (resp: any) => resp?.data ?? null,
     }),
-    getEmployeeDetails: builder.query<any, number>({
+    getEmployeeDetails: builder.query<any, string>({
       query: (employeeId) => `/leaderboard/employee-details/${employeeId}`,
       transformResponse: (resp: any) => resp?.data ?? null,
     }),

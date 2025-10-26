@@ -75,7 +75,7 @@ export default function LoginPage() {
               autoComplete="username" 
             />
             <p className="text-xs text-gray-500 mt-1">
-              You can login with either your employee ID (e.g., 1761215080220) or email address
+              
             </p>
           </div>
           <div>

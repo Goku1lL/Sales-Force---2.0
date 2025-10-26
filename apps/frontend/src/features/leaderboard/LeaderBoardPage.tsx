@@ -6,14 +6,23 @@ import type { RootState } from '../../app/store';
 export default function LeaderBoardPage() {
   const [activeTab, setActiveTab] = useState<'cluster' | 'city'>('cluster');
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-  const employeeId = useSelector((s: RootState) => s.auth.user?.employee_id || 0);
+  const { user, token } = useSelector((s: RootState) => s.auth);
+  const employeeId = user?.employee_id;
+
+  // Don't render anything if user is not authenticated
+  if (!token || !employeeId) {
+    return <div className="p-4">Please log in to view the leaderboard.</div>;
+  }
 
   const { data: userProfile } = useGetUserProfileQuery(employeeId, { skip: !employeeId });
   const { data: clusterData } = useGetClusterLeaderboardQuery(userProfile?.cluster || '', { skip: !userProfile?.cluster });
   const { data: cityData } = useGetCityLeaderboardQuery(Number(userProfile?.CityId) || 0, { skip: !userProfile?.CityId });
-  const { data: employeeDetails } = useGetEmployeeDetailsQuery(Number(selectedEmployee) || 0, {
-    skip: !selectedEmployee
-  });
+  const { data: employeeDetails } = useGetEmployeeDetailsQuery(
+    selectedEmployee || '', 
+    {
+      skip: !selectedEmployee
+    }
+  );
 
   const leaderboardData = activeTab === 'cluster' ? clusterData : cityData;
 

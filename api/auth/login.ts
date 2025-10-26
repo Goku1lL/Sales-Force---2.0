@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -13,7 +16,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: 'employee_id or email and password are required' });
     }
 
-    // Mock authentication for now - replace with real database queries later
+    // For now, use mock authentication until database is properly configured
+    // TODO: Replace with real database queries
     if (password === 'password123') {
       const secret = process.env.JWT_SECRET as string || 'fallback-secret';
       const refreshSecret = process.env.JWT_REFRESH_SECRET as string || secret;

@@ -24184,7 +24184,7 @@ model SalesApp_Login {
 
 model SalesExecutiveApp_Login {
   Id            BigInt    @id @default(autoincrement())
-  employee_id   BigInt?
+  employee_id   String?   @db.VarChar(400)
   password_hash String?   @db.VarChar(400)
   full_name     String?   @db.VarChar(400)
   email         String?   @db.VarChar(400)

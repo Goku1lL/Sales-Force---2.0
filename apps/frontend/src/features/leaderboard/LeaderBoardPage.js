@@ -5,11 +5,16 @@ import { useSelector } from 'react-redux';
 export default function LeaderBoardPage() {
     const [activeTab, setActiveTab] = useState('cluster');
     const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const employeeId = useSelector((s) => s.auth.user?.employee_id || 0);
+    const { user, token } = useSelector((s) => s.auth);
+    const employeeId = user?.employee_id;
+    // Don't render anything if user is not authenticated
+    if (!token || !employeeId) {
+        return _jsx("div", { className: "p-4", children: "Please log in to view the leaderboard." });
+    }
     const { data: userProfile } = useGetUserProfileQuery(employeeId, { skip: !employeeId });
     const { data: clusterData } = useGetClusterLeaderboardQuery(userProfile?.cluster || '', { skip: !userProfile?.cluster });
     const { data: cityData } = useGetCityLeaderboardQuery(Number(userProfile?.CityId) || 0, { skip: !userProfile?.CityId });
-    const { data: employeeDetails } = useGetEmployeeDetailsQuery(Number(selectedEmployee) || 0, {
+    const { data: employeeDetails } = useGetEmployeeDetailsQuery(selectedEmployee || '', {
         skip: !selectedEmployee
     });
     const leaderboardData = activeTab === 'cluster' ? clusterData : cityData;

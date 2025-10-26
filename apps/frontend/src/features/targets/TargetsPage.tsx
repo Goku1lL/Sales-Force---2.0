@@ -4,12 +4,16 @@ import type { RootState } from '../../app/store';
 import { useGetEmployeeDetailsQuery } from '../leaderboard/leaderboardApi';
 
 export default function TargetsPage() {
-  const user = useSelector((s: RootState) => s.auth.user);
-  const token = useSelector((s: RootState) => s.auth.token);
+  const { user, token } = useSelector((s: RootState) => s.auth);
   const employeeId = user?.employee_id;
 
+  // Don't render anything if user is not authenticated
+  if (!token || !employeeId) {
+    return <div className="p-4">Please log in to view targets.</div>;
+  }
+
   const { data: employeeDetails, isLoading, error } = useGetEmployeeDetailsQuery(
-    Number(employeeId) || 0,
+    employeeId?.toString() || '',
     {
       skip: !employeeId
     }
