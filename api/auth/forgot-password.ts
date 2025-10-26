@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
-import { getPrisma } from '../../_lib/prisma';
-import { badRequest, serverError } from '../../_lib/errors';
+import { getPrisma } from '../_lib/prisma';
+import { badRequest, serverError } from '../_lib/errors';
 
 function getBaseUrl(req: VercelRequest) {
   const origin = req.headers['origin'] || `http://localhost:${process.env.PORT || 3000}`;
