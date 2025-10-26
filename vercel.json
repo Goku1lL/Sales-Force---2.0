@@ -4,11 +4,6 @@
   "outputDirectory": "apps/frontend/dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/auth/(.*)", "destination": "/api/auth" },
-    { "source": "/api/dashboard/(.*)", "destination": "/api/dashboard" },
-    { "source": "/api/leaderboard/(.*)", "destination": "/api/leaderboard" },
-    { "source": "/api/targets/(.*)", "destination": "/api/targets" },
-    { "source": "/api/customers/(.*)", "destination": "/api/customers" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
