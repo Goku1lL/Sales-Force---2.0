@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 16px;
+}
+
+.theme-dark-neon {
+  --bg: #0c0f17;
+  --card: #11162a;
+  --text: #e6f6ff;
+  --muted: #9db4c0;
+
+  --neon-accent: #22d3ee;
+  --neon-accent-2: #a78bfa;
+  --neon-warn: #fbbf24;
+
+  --neon-accent-glow: rgba(34, 211, 238, 0.7);
+}
+
+.theme-dark-neon {
+  background:
+    radial-gradient(80vw 60vh at 10% -10%, rgba(34,211,238,0.08), transparent 60%),
+    radial-gradient(80vw 60vh at 110% 10%, rgba(167,139,250,0.08), transparent 60%),
+    var(--bg);
+  color: var(--text);
+}
+
+/* Custom animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-glow { animation: none !important; }
+  .animate-fadeInUp { animation: none !important; }
+}

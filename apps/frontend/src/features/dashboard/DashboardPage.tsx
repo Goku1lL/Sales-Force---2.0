@@ -1,0 +1,705 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../app/store';
+import { useGetSummaryQuery, useGetLiveActivityQuery, useGetUrgentActionsQuery, useGetNearbyOpportunitiesQuery } from './dashboardApi';
+import { useGetUserProfileQuery, useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery } from '../leaderboard/leaderboardApi';
+import { useTheme } from '../../shared/ThemeContext';
+import { ThemedCard, ThemedBadge, ThemedProgress } from '../../shared';
+import { useWebSocket } from '../../shared/useWebSocket';
+
+// Clean Progress Component - Single Responsibility
+function Progress({ value, color = 'green' }: { value: number; color?: 'green' | 'orange' | 'blue' | 'purple' }) {
+  const { currentTheme } = useTheme();
+  
+  const colorClass = color === 'green' ? 'from-green-400 to-emerald-500' : 
+                    color === 'orange' ? 'from-orange-400 to-red-500' : 
+                    color === 'blue' ? 'from-blue-400 to-cyan-500' :
+                    'from-purple-400 to-pink-500';
+  
+  const displayWidth = Math.max(5, Math.min(100, Math.max(0, value)));
+  
+  const trackClass = currentTheme.isDark ? 'bg-gray-700 border-gray-500' : 'bg-gray-200 border-gray-300';
+  
+  return (
+    <div className={`h-6 rounded-full overflow-hidden shadow-inner border-2 ${trackClass}`}>
+      <div 
+        className={`h-full bg-gradient-to-r ${colorClass} rounded-full transition-all duration-1000 ease-out relative`} 
+        style={{ width: `${displayWidth}%` }}
+      />
+      <div className="absolute left-1 top-1/2 transform -translate-y-1/2 w-1 h-1 bg-white/70 rounded-full animate-pulse"></div>
+    </div>
+  );
+}
+
+// Enhanced Leaderboard Item Component - Premium Design
+function LeaderboardItem({ person, rank, isCurrentUser }: { person: any; rank: number; isCurrentUser: boolean }) {
+  const { currentTheme } = useTheme();
+  
+  const getRankIcon = (rank: number) => {
+    if (rank === 1) return '👑';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return rank;
+  };
+
+  const getRankColor = (rank: number) => {
+    if (rank === 1) return 'from-yellow-400 via-yellow-500 to-amber-500';
+    if (rank === 2) return 'from-gray-300 via-gray-400 to-gray-500';
+    if (rank === 3) return 'from-orange-400 via-orange-500 to-red-500';
+    return 'from-indigo-400 via-blue-500 to-purple-500';
+  };
+
+  const getRankGlow = (rank: number) => {
+    if (rank === 1) return 'shadow-lg shadow-yellow-500/30';
+    if (rank === 2) return 'shadow-lg shadow-gray-400/30';
+    if (rank === 3) return 'shadow-lg shadow-orange-500/30';
+    return 'shadow-md shadow-indigo-500/20';
+  };
+
+  const achievements = typeof person.weekly_achievements === 'number'
+    ? person.weekly_achievements
+    : parseFloat(person.weekly_achievements) || 0;
+  const orders = person.orders || 0;
+
+  const textColor = currentTheme.isDark || currentTheme.isNeon ? 'text-white' : 'text-gray-900';
+  const bgColor = isCurrentUser 
+    ? (currentTheme.isDark || currentTheme.isNeon 
+        ? 'bg-gradient-to-r from-blue-600/30 via-blue-500/20 to-indigo-600/30 border-blue-400/50 shadow-lg shadow-blue-500/20' 
+        : 'bg-gradient-to-r from-blue-50 via-blue-100 to-indigo-50 border-blue-300 shadow-lg shadow-blue-200/50')
+    : (currentTheme.isDark || currentTheme.isNeon 
+        ? 'bg-gradient-to-r from-gray-800/60 via-gray-700/40 to-gray-800/60 border-gray-600/50 hover:border-gray-500' 
+        : 'bg-gradient-to-r from-white via-gray-50 to-white border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md');
+
+  return (
+    <div className={`group relative overflow-hidden rounded-2xl border-2 ${bgColor} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}>
+      {/* Animated background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+      
+      <div className="relative flex items-center p-4">
+        {/* Left side - Rank and User Info */}
+        <div className="flex items-center space-x-4 flex-1 min-w-0">
+          {/* Enhanced Rank Badge */}
+          <div className={`relative w-12 h-12 rounded-2xl bg-gradient-to-br ${getRankColor(rank)} flex items-center justify-center text-xl font-bold text-white ${getRankGlow(rank)} transition-all duration-300 group-hover:scale-110 flex-shrink-0`}>
+            <span className="drop-shadow-sm">{getRankIcon(rank)}</span>
+            {/* Crown animation for rank 1 */}
+            {rank === 1 && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full animate-pulse"></div>
+            )}
+          </div>
+
+          {/* User Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-2">
+              <p className={`font-bold text-base truncate ${textColor} group-hover:text-opacity-90`}>
+                {person.Name || person.name || 'Unknown User'}
+              </p>
+              {isCurrentUser && (
+                <span className="px-2 py-1 text-xs font-bold text-blue-600 bg-blue-100 rounded-full animate-pulse flex-shrink-0">
+                  YOU
+                </span>
+              )}
+            </div>
+            <p className={`text-sm ${currentTheme.isDark || currentTheme.isNeon ? 'text-gray-300' : 'text-gray-600'} group-hover:text-opacity-80`}>
+              {person.cluster || 'Unknown Cluster'}
+            </p>
+          </div>
+        </div>
+
+        {/* Right side - Stats */}
+        <div className="text-right space-y-1 ml-4 flex-shrink-0">
+          <div className="flex items-center space-x-2 justify-end">
+            <span className="text-2xl">📊</span>
+            <p className={`font-bold text-lg ${textColor} group-hover:text-opacity-90 whitespace-nowrap`}>
+              {achievements.toLocaleString()}
+            </p>
+          </div>
+          <div className="flex items-center space-x-2 justify-end">
+            <span className="text-sm">🎯</span>
+            <p className={`text-sm font-medium ${currentTheme.isDark || currentTheme.isNeon ? 'text-gray-300' : 'text-gray-600'} group-hover:text-opacity-80 whitespace-nowrap`}>
+              units achieved
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main Dashboard Component - Clean Architecture
+export default function DashboardPage() {
+  const { currentTheme } = useTheme();
+  const [leaderboardType, setLeaderboardType] = useState<'cluster' | 'city'>('cluster');
+  const [liveActivities, setLiveActivities] = useState<any[]>([]);
+
+  // Redux state
+  const { user } = useSelector((state: RootState) => state.auth);
+  
+  // API queries - Only make calls when user is authenticated
+  const employeeId = user?.employee_id;
+  const { data: summary, isLoading: summaryLoading, error: summaryError } = useGetSummaryQuery(employeeId?.toString() || '', { skip: !employeeId });
+  const { data: profile, isLoading: profileLoading, error: profileError } = useGetUserProfileQuery(employeeId, { skip: !employeeId });
+  
+  const { data: clusterLeaderboard, isLoading: clusterLoading } = useGetClusterLeaderboardQuery('BLR-Cluster1', {
+    skip: !employeeId
+  });
+  const { data: cityLeaderboard, isLoading: cityLoading } = useGetCityLeaderboardQuery(2, {
+    skip: !employeeId
+  });
+  const { data: liveActivity } = useGetLiveActivityQuery();
+  const { data: urgentActions } = useGetUrgentActionsQuery(employeeId, { skip: !employeeId });
+  const { data: nearbyOpportunities } = useGetNearbyOpportunitiesQuery();
+
+  // Live activity callback
+  const handleLiveActivityUpdate = useCallback((activities: any[]) => {
+    setLiveActivities(activities);
+  }, []);
+
+  // Initialize live activities with API data
+  useEffect(() => {
+    if ((liveActivity as any)?.data && liveActivities.length === 0) {
+      setLiveActivities((liveActivity as any).data);
+    }
+  }, [liveActivity, liveActivities.length]);
+
+  // WebSocket connection with live activity handler
+  useWebSocket(user?.employee_id || null, handleLiveActivityUpdate);
+
+  // Calculate derived values using correct API data
+  const dailyProgress = summary?.data?.dailyPercent || 0;
+  const weeklyProgress = summary?.data?.weeklyPercent || 0;
+  const dailyProgressCapped = Math.min(100, dailyProgress);
+  const weeklyProgressCapped = Math.min(100, weeklyProgress);
+
+  // Pending amounts (what they still need to earn - this is still valid)
+  const dailyPending = Math.max(0, (summary?.data?.todayTarget || 0) - (summary?.data?.todayEarnings || 0));
+  const weeklyPending = Math.max(0, (summary?.data?.weeklyTarget || 0) - (summary?.data?.weeklyEarnings || 0));
+
+  const cityRank = profile?.city_rank || 'N/A';
+  const clusterRank = profile?.cluster_rank || 'N/A';
+  const currentLeaderboard = leaderboardType === 'cluster' ? clusterLeaderboard : cityLeaderboard;
+  const leaderboardLoading = leaderboardType === 'cluster' ? clusterLoading : cityLoading;
+
+
+  // Authentication check
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Authentication Required</h2>
+          <p className="text-gray-600 dark:text-gray-400">Please log in to access the dashboard</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (summaryLoading || profileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (summaryError) {
+  return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 dark:text-gray-400">Please try refreshing the page</p>
+      </div>
+    </div>
+  );
+}
+
+  return (
+    <div className={`min-h-screen ${
+      currentTheme.isDark 
+        ? 'bg-gray-900' 
+        : currentTheme.isNeon 
+        ? 'bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900'
+        : 'bg-gray-50'
+    }`}>
+      {/* Header */}
+      <div className={`relative overflow-hidden ${
+        currentTheme.isDark 
+          ? 'bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800' 
+          : currentTheme.isNeon 
+          ? 'bg-gradient-to-r from-gray-800 via-blue-900 to-indigo-900'
+          : 'bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50'
+      }`}>
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }} />
+      </div>
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {/* Avatar/Icon */}
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${
+                currentTheme.isDark 
+                  ? 'bg-gradient-to-br from-blue-500 to-purple-600' 
+                  : currentTheme.isNeon 
+                  ? 'bg-gradient-to-br from-cyan-500 to-blue-500'
+                  : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+              }`}>
+                <span className="text-lg text-white font-semibold">
+                  {user?.name?.charAt(0) || 'S'}
+                </span>
+    </div>
+              
+              {/* Welcome Text */}
+              <div>
+                <h1 className={`text-xl font-semibold ${
+                  currentTheme.isDark 
+                    ? 'text-white' 
+                    : currentTheme.isNeon 
+                    ? 'text-white'
+                    : 'text-gray-900'
+                }`}>
+                  Welcome back, {user?.name || 'Sales Executive'}! 👋
+                </h1>
+                <p className={`text-sm ${
+                  currentTheme.isDark 
+                    ? 'text-gray-300' 
+                    : currentTheme.isNeon 
+                    ? 'text-gray-300'
+                    : 'text-gray-600'
+                }`}>
+                  Ready to crush your targets today? 🚀
+                </p>
+              </div>
+            </div>
+            
+            {/* Quick Stats */}
+            <div className="hidden md:flex items-center space-x-4">
+              <div className={`text-center px-3 py-2 rounded-lg ${
+                currentTheme.isDark 
+                  ? 'bg-white/10 backdrop-blur-sm' 
+                  : currentTheme.isNeon 
+                  ? 'bg-white/10 backdrop-blur-sm'
+                  : 'bg-white/80 backdrop-blur-sm shadow-md'
+              }`}>
+                <div className={`text-lg font-semibold ${
+                  currentTheme.isDark
+                    ? 'text-cyan-400'
+                    : currentTheme.isNeon
+                    ? 'text-cyan-400'
+                    : 'text-blue-600'
+                }`}>
+                  {cityRank}
+                </div>
+                <div className={`text-xs ${
+                  currentTheme.isDark
+                    ? 'text-gray-400'
+                    : currentTheme.isNeon
+                    ? 'text-gray-400'
+                    : 'text-gray-600'
+                }`}>
+                  City Rank
+            </div>
+          </div>
+
+              <div className={`text-center px-3 py-2 rounded-lg ${
+                currentTheme.isDark 
+                  ? 'bg-white/10 backdrop-blur-sm' 
+                  : currentTheme.isNeon 
+                  ? 'bg-white/10 backdrop-blur-sm'
+                  : 'bg-white/80 backdrop-blur-sm shadow-md'
+              }`}>
+                <div className={`text-lg font-semibold ${
+                  currentTheme.isDark 
+                    ? 'text-green-400' 
+                    : currentTheme.isNeon 
+                    ? 'text-green-400'
+                    : 'text-green-600'
+                }`}>
+                  {Math.round(dailyProgress)}%
+                </div>
+                <div className={`text-xs ${
+                  currentTheme.isDark 
+                    ? 'text-gray-400' 
+                    : currentTheme.isNeon 
+                    ? 'text-gray-400'
+                    : 'text-gray-600'
+                }`}>
+                  Daily Progress
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Left Column - Target Cards */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Daily Target Card */}
+            <ThemedCard accent="amber">
+              <div className="flex items-start gap-4 mb-3" style={{ minHeight: '80px' }}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                    currentTheme.isDark
+                      ? 'bg-white/5 ring-1 ring-white/10'
+                      : 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-amber-300/30'
+                  }`}>
+                    <span className="text-3xl">💰</span>
+                  </div>
+                  <div className="min-w-0 flex-1 pr-4">
+                    <h3 className={`text-xl font-bold whitespace-nowrap ${
+                      currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
+                    }`}>
+                        Day Pending
+                      </h3>
+                    <p className={`text-sm font-bold ${
+                      currentTheme.isDark ? 'text-yellow-200/90' : 'text-amber-900'
+                    }`}>
+                      Pending to earn
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end space-y-2 flex-shrink-0">
+                  <ThemedBadge className="text-xs px-3 py-1.5 whitespace-nowrap">CLUSTER RANK {clusterRank}</ThemedBadge>
+                </div>
+              </div>
+              <div>
+                <p className={`text-5xl font-extrabold mb-1 ${
+                  currentTheme.isDark ? 'text-cyan-300' : 'text-gray-900'
+                }`}>
+                  ₹{dailyPending.toFixed(0)}
+                  </p>
+                  <p className={`text-sm font-medium mb-3 ${
+                    currentTheme.isDark ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Target: ₹{summary?.data?.todayTarget?.toFixed(0) || '0'} • Earned: ₹{summary?.data?.todayEarnings?.toFixed(0) || '0'}
+                  </p>
+                  <div className="flex justify-between text-sm mb-3">
+                  <span className={`font-bold ${
+                    currentTheme.isDark ? 'text-yellow-200' : 'text-amber-900'
+                  }`}>
+                    Progress
+                  </span>
+                  <span className={`font-bold ${
+                    currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
+                  }`}>
+                      {Math.round(dailyProgress)}% complete
+                    </span>
+                </div>
+                <ThemedProgress value={dailyProgressCapped} theme="amber" />
+              </div>
+            </ThemedCard>
+
+            {/* Weekly Target Card */}
+            <ThemedCard accent="purple">
+              <div className="flex items-start gap-4 mb-3" style={{ minHeight: '80px' }}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                    currentTheme.isDark
+                      ? 'bg-white/5 ring-1 ring-white/10'
+                      : 'bg-gradient-to-br from-pink-500 to-red-500 shadow-lg shadow-pink-300/30'
+                  }`}>
+                    <span className="text-3xl">📅</span>
+                  </div>
+                  <div className="min-w-0 flex-1 pr-4">
+                    <h3 className={`text-xl font-bold whitespace-nowrap ${
+                      currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
+                    }`}>
+                        Week Pending
+                      </h3>
+                    <p className={`text-sm font-bold ${
+                      currentTheme.isDark ? 'text-purple-200/90' : 'text-green-800'
+                    }`}>
+                      Keep your streak alive
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end space-y-2 flex-shrink-0">
+                  <ThemedBadge className="text-xs px-3 py-1.5 whitespace-nowrap">CITY RANK {cityRank}</ThemedBadge>
+                </div>
+              </div>
+              <div>
+                <p className={`text-5xl font-extrabold mb-1 ${
+                  currentTheme.isDark ? 'text-cyan-300' : 'text-gray-900'
+                }`}>
+                    ₹{weeklyPending.toFixed(0)}
+                  </p>
+                  <p className={`text-sm font-medium mb-3 ${
+                    currentTheme.isDark ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Target: ₹{summary?.data?.weeklyTarget?.toFixed(0) || '0'} • Earned: ₹{summary?.data?.weeklyEarnings?.toFixed(0) || '0'}
+                  </p>
+                  <div className="flex justify-between text-sm mb-3">
+                  <span className={`font-bold ${
+                    currentTheme.isDark ? 'text-purple-200' : 'text-rose-800'
+                  }`}>
+                    Progress
+                  </span>
+                  <span className={`font-bold ${
+                    currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
+                  }`}>
+                    {Math.round(weeklyProgress)}% complete
+                    </span>
+                </div>
+                <ThemedProgress value={weeklyProgressCapped} theme="rose" />
+              </div>
+            </ThemedCard>
+
+            </div>
+
+          {/* Right Column - Leaderboard */}
+          <div className="space-y-6">
+            
+            {/* Enhanced Leaderboard Header */}
+            <div className={`relative overflow-hidden rounded-2xl p-6 shadow-xl ${
+              currentTheme.isDark 
+                ? 'bg-gradient-to-br from-gray-800 via-gray-700 to-gray-800' 
+                : currentTheme.isNeon 
+                ? 'bg-gradient-to-br from-gray-800 via-blue-900 to-indigo-900'
+                : 'bg-gradient-to-br from-white via-gray-50 to-white'
+            }`}>
+              {/* Background Pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.1'%3E%3Cpath d='M20 20c0-5.5-4.5-10-10-10s-10 4.5-10 10 4.5 10 10 10 10-4.5 10-10zm10 0c0-5.5-4.5-10-10-10s-10 4.5-10 10 4.5 10 10 10 10-4.5 10-10z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                }} />
+              </div>
+              
+              <div className="relative flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    currentTheme.isDark 
+                      ? 'bg-gradient-to-br from-yellow-500 to-amber-600' 
+                      : currentTheme.isNeon 
+                      ? 'bg-gradient-to-br from-cyan-500 to-blue-500'
+                      : 'bg-gradient-to-br from-yellow-400 to-amber-500'
+                  } shadow-lg`}>
+                    <span className="text-xl">🏆</span>
+                  </div>
+                  <div>
+                    <h2 className={`text-2xl font-bold ${
+                      currentTheme.isDark 
+                        ? 'text-white' 
+                        : currentTheme.isNeon 
+                        ? 'text-white'
+                        : 'text-gray-900'
+                    }`}>
+                      Leaderboard
+                    </h2>
+                    <p className={`text-sm ${
+                      currentTheme.isDark 
+                        ? 'text-gray-300' 
+                        : currentTheme.isNeon 
+                        ? 'text-gray-300'
+                        : 'text-gray-600'
+                    }`}>
+                      Top performers this week
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Enhanced Toggle */}
+                <div className={`flex rounded-xl p-1 shadow-lg ${
+                  currentTheme.isDark 
+                    ? 'bg-gray-700/50 backdrop-blur-sm' 
+                    : currentTheme.isNeon 
+                    ? 'bg-gray-700/30 backdrop-blur-sm'
+                    : 'bg-gray-100 shadow-gray-200/50'
+                  }`}>
+                    <button
+                    onClick={() => setLeaderboardType('cluster')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
+                      leaderboardType === 'cluster'
+                        ? currentTheme.isDark || currentTheme.isNeon
+                          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+                          : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+                        : currentTheme.isDark || currentTheme.isNeon
+                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    }`}
+                  >
+                      Cluster
+                    </button>
+                    <button
+                    onClick={() => setLeaderboardType('city')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
+                      leaderboardType === 'city'
+                        ? currentTheme.isDark || currentTheme.isNeon
+                          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+                          : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+                        : currentTheme.isDark || currentTheme.isNeon
+                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    }`}
+                  >
+                      City
+                    </button>
+                </div>
+              </div>
+              
+              {/* Enhanced Leaderboard Content */}
+              <div className="space-y-4">
+                {leaderboardLoading ? (
+                  <div className="text-center py-12">
+                    <div className="relative">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-500 mx-auto mb-4"></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-300 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                    </div>
+                    <p className={`text-lg font-medium ${
+                      currentTheme.isDark 
+                        ? 'text-gray-300' 
+                        : currentTheme.isNeon 
+                        ? 'text-gray-300'
+                        : 'text-gray-600'
+                    }`}>Loading leaderboard...</p>
+                    <p className={`text-sm ${
+                      currentTheme.isDark 
+                        ? 'text-gray-400' 
+                        : currentTheme.isNeon 
+                        ? 'text-gray-400'
+                        : 'text-gray-500'
+                    }`}>Fetching top performers</p>
+                  </div>
+                ) : (currentLeaderboard as any)?.length > 0 ? (
+              <div className="space-y-3">
+                    {(currentLeaderboard as any).slice(0, 5).map((person: any, index: number) => (
+                      <div key={person.id || person.employee_id || index} className="animate-fadeInUp" style={{ animationDelay: `${index * 100}ms` }}>
+                        <LeaderboardItem
+                          person={person}
+                          rank={index + 1}
+                          isCurrentUser={person.id === user?.id || person.employee_id === user?.id}
+                        />
+                      </div>
+                    ))}
+                    {(currentLeaderboard as any).length > 5 && (
+                      <div className="text-center pt-2">
+                        <p className={`text-xs ${
+                          currentTheme.isDark 
+                            ? 'text-gray-400' 
+                            : currentTheme.isNeon 
+                            ? 'text-gray-400'
+                            : 'text-gray-500'
+                        }`}>
+                          Showing top 5 of {(currentLeaderboard as any).length} participants
+                        </p>
+              </div>
+            )}
+          </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${
+                      currentTheme.isDark 
+                        ? 'bg-gray-700' 
+                        : currentTheme.isNeon 
+                        ? 'bg-gray-700/50'
+                        : 'bg-gray-100'
+                    }`}>
+                      <span className="text-2xl">📊</span>
+                    </div>
+                    <p className={`text-lg font-medium ${
+                      currentTheme.isDark 
+                        ? 'text-gray-300' 
+                        : currentTheme.isNeon 
+                        ? 'text-gray-300'
+                        : 'text-gray-600'
+                    }`}>No leaderboard data available</p>
+                    <p className={`text-sm ${
+                      currentTheme.isDark 
+                        ? 'text-gray-400' 
+                        : currentTheme.isNeon 
+                        ? 'text-gray-400'
+                        : 'text-gray-500'
+                    }`}>Check back later for updates</p>
+                  </div>
+                )}
+              </div>
+                      </div>
+
+            {/* Live Activity */}
+            {liveActivities.length > 0 && (
+              <div className={`rounded-2xl p-6 shadow-lg ${
+                currentTheme.isDark
+                  ? 'bg-gray-800'
+                  : currentTheme.isNeon
+                    ? 'bg-gray-800/90'
+                    : 'bg-white'
+              }`}>
+                <h3 className={`text-lg font-bold mb-4 ${
+                  currentTheme.isDark
+                    ? 'text-white'
+                    : currentTheme.isNeon
+                      ? 'text-white'
+                      : 'text-gray-900'
+                }`}>
+                  Live Activity
+                </h3>
+                <div className="space-y-2">
+                  {liveActivities.slice(0, 5).map((activity: any, index: number) => (
+                    <div key={activity.id || index} className={`flex items-center space-x-3 p-2 rounded-lg ${
+                      currentTheme.isDark
+                        ? 'bg-gray-700'
+                        : currentTheme.isNeon
+                          ? 'bg-gray-700/50'
+                          : 'bg-gray-50'
+                    }`}>
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <div className="flex-1">
+                        <p className={`text-sm ${
+                          currentTheme.isDark
+                            ? 'text-gray-300'
+                            : currentTheme.isNeon
+                              ? 'text-gray-300'
+                              : 'text-gray-700'
+                        }`}>{activity.message}</p>
+                        <p className={`text-xs mt-1 ${
+                          currentTheme.isDark
+                            ? 'text-gray-400'
+                            : currentTheme.isNeon
+                              ? 'text-gray-400'
+                              : 'text-gray-500'
+                        }`}>
+                          {activity.employee_name} • {activity.cluster} • {activity.timestamp}
+                        </p>
+                      </div>
+                      {activity.variable_pay && (
+                        <div className="text-right">
+                          <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+                            ₹{activity.variable_pay}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {liveActivities.length > 5 && (
+                  <p className={`text-xs mt-3 text-center ${
+                    currentTheme.isDark
+                      ? 'text-gray-400'
+                      : currentTheme.isNeon
+                        ? 'text-gray-400'
+                        : 'text-gray-500'
+                  }`}>
+                    Showing 5 of {liveActivities.length} recent activities
+                  </p>
+                )}
+              </div>
+            )}
+
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

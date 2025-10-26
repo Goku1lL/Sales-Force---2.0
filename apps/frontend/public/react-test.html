@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>React Test</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+</head>
+<body>
+    <div id="react-root"></div>
+    <script>
+        const { createElement: h, StrictMode } = React;
+        const { createRoot } = ReactDOM;
+        
+        function TestApp() {
+            return h('div', { style: { padding: '20px', fontFamily: 'Arial, sans-serif' } },
+                h('h1', { style: { color: '#333' } }, 'React Test'),
+                h('p', { style: { color: '#666' } }, 'React is working! You should see this text.'),
+                h('div', { style: { marginTop: '20px', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '5px' } },
+                    h('p', null, 'If you can see this, React is rendering correctly.')
+                )
+            );
+        }
+        
+        const container = document.getElementById('react-root');
+        const root = createRoot(container);
+        root.render(h(StrictMode, null, h(TestApp)));
+    </script>
+</body>
+</html>
