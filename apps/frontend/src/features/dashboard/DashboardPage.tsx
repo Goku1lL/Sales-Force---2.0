@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
-import { useGetSummaryQuery, useGetLiveActivityQuery, useGetUrgentActionsQuery, useGetNearbyOpportunitiesQuery } from './dashboardApi';
+import { useGetSummaryQuery, useGetUrgentActionsQuery, useGetNearbyOpportunitiesQuery } from './dashboardApi';
 import { useGetUserProfileQuery, useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery } from '../leaderboard/leaderboardApi';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemedCard, ThemedBadge, ThemedProgress } from '../../shared';
-import { useWebSocket } from '../../shared/useWebSocket';
+import { useLiveActivity } from '../../shared/useLiveActivity';
 
 // Clean Progress Component - Single Responsibility
 function Progress({ value, color = 'green' }: { value: number; color?: 'green' | 'orange' | 'blue' | 'purple' }) {
@@ -129,8 +129,6 @@ function LeaderboardItem({ person, rank, isCurrentUser }: { person: any; rank: n
 export default function DashboardPage() {
   const { currentTheme } = useTheme();
   const [leaderboardType, setLeaderboardType] = useState<'cluster' | 'city'>('cluster');
-  const [liveActivities, setLiveActivities] = useState<any[]>([]);
-
   // Redux state
   const { user } = useSelector((state: RootState) => state.auth);
   
@@ -145,24 +143,11 @@ export default function DashboardPage() {
   const { data: cityLeaderboard, isLoading: cityLoading } = useGetCityLeaderboardQuery(2, {
     skip: !employeeId
   });
-  const { data: liveActivity } = useGetLiveActivityQuery();
   const { data: urgentActions } = useGetUrgentActionsQuery(employeeId, { skip: !employeeId });
   const { data: nearbyOpportunities } = useGetNearbyOpportunitiesQuery();
 
-  // Live activity callback
-  const handleLiveActivityUpdate = useCallback((activities: any[]) => {
-    setLiveActivities(activities);
-  }, []);
-
-  // Initialize live activities with API data
-  useEffect(() => {
-    if ((liveActivity as any)?.data && liveActivities.length === 0) {
-      setLiveActivities((liveActivity as any).data);
-    }
-  }, [liveActivity, liveActivities.length]);
-
-  // WebSocket connection with live activity handler
-  useWebSocket(user?.employee_id || null, handleLiveActivityUpdate);
+  // Live activity with client-side polling
+  const { activities: liveActivities, isLoading: liveActivityLoading } = useLiveActivity();
 
   // Calculate derived values using correct API data
   const dailyProgress = summary?.data?.dailyPercent || 0;

@@ -13,7 +13,7 @@ export function startRealtime(io: IOServer) {
     hasClients = io.engine.clientsCount > 0;
   });
 
-  // Live activity every 30s (increased frequency for better real-time feel)
+  // Live activity every 60s (reduced frequency to save memory)
   setInterval(async () => {
     if (!hasClients) return; // Skip if no clients connected
     
@@ -64,7 +64,7 @@ export function startRealtime(io: IOServer) {
       console.error('Error in live activity publisher:', error);
       // ignore transient errors
     }
-  }, 30000); // Reduced interval to 30s
+  }, 60000); // Increased interval to 60s
 
   // Urgent actions every 120s (reduced frequency)
   setInterval(async () => {

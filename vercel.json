@@ -5,22 +5,25 @@
       "src": "apps/frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "apps/frontend/dist"
+        "distDir": "dist"
       }
     },
     {
-      "src": "apps/backend/server.ts",
+      "src": "apps/frontend/api/**/*.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "apps/backend/src/server.ts"
+      "dest": "/api/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "apps/frontend/dist/$1"
+      "dest": "/apps/frontend/dist/$1"
     }
-  ]
+  ],
+  "env": {
+    "DATABASE_URL": "@database_url"
+  }
 }
