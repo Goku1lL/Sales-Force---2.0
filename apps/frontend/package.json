@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "vercel-build": "prisma generate && tsc -b && vite build"
+    "vercel-build": "prisma generate --schema=./prisma/schema.prisma && tsc -b && vite build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
