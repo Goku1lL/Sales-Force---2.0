@@ -9,7 +9,7 @@ export default function TargetsPage() {
   const employeeId = user?.employee_id;
 
   const { data: employeeDetails, isLoading, error } = useGetEmployeeDetailsQuery(
-    employeeId?.toString() || '',
+    Number(employeeId) || 0,
     {
       skip: !employeeId
     }

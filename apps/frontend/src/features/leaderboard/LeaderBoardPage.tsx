@@ -10,7 +10,7 @@ export default function LeaderBoardPage() {
 
   const { data: userProfile } = useGetUserProfileQuery(employeeId, { skip: !employeeId });
   const { data: clusterData } = useGetClusterLeaderboardQuery(userProfile?.cluster || '', { skip: !userProfile?.cluster });
-  const { data: cityData } = useGetCityLeaderboardQuery(userProfile?.CityId || 0, { skip: !userProfile?.CityId });
+  const { data: cityData } = useGetCityLeaderboardQuery(Number(userProfile?.CityId) || 0, { skip: !userProfile?.CityId });
   const { data: employeeDetails } = useGetEmployeeDetailsQuery(selectedEmployee || '', {
     skip: !selectedEmployee
   });
