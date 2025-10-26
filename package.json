@@ -11,7 +11,7 @@
     "build": "pnpm --filter @sfa/frontend build",
     "start": "pnpm --filter @sfa/frontend preview",
     "lint": "echo \"No lint at root\"",
-    "vercel-build": "pnpm install && pnpm run build"
+    "vercel-build": "cd apps/backend && npx prisma generate && cd ../.. && pnpm install && pnpm run build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
