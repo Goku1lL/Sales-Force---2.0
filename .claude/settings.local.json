@@ -9,7 +9,12 @@
       "Bash(git commit -m \"$(cat <<''EOF''\nFix @sfa/shared build: Move TypeScript deps to dependencies\n\n- Moved @types/bcrypt, @types/jsonwebtoken, @types/node from devDependencies to dependencies\n- Moved typescript from devDependencies to dependencies\n- Ensures type definitions are available during Vercel production build\n\nThis fixes the build error where TypeScript couldn''t find type definitions\nfor jsonwebtoken because devDependencies were skipped in production mode.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(npx tsc --noEmit --project tsconfig.api.json)",
       "Bash(git commit:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "Bash(vercel link:*)",
+      "Bash(vercel dev:*)",
+      "Bash(curl:*)",
+      "Bash(vercel logs:*)"
     ],
     "deny": [],
     "ask": []
