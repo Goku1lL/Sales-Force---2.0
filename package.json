@@ -7,8 +7,6 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "echo \"Please run 'vercel dev' directly to start local development\" && exit 1",
-    "dev:vite": "pnpm --filter @sfa/frontend dev",
     "build": "pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
     "start": "pnpm --filter @sfa/frontend preview",
     "lint": "echo \"No lint at root\""
