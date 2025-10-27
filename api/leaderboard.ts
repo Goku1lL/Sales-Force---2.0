@@ -11,6 +11,17 @@ function getSubRoute(req: VercelRequest): string {
   return match ? match[1] : '';
 }
 
+// Helper to parse path parameters and populate req.query
+function parsePathParams(req: VercelRequest, subRoute: string, pattern: RegExp, paramNames: string[]) {
+  const match = subRoute.match(pattern);
+  if (match) {
+    paramNames.forEach((name, index) => {
+      if (!req.query) req.query = {};
+      req.query[name] = match[index + 1];
+    });
+  }
+}
+
 // Handler: GET /api/leaderboard/city/[cityId]
 async function handleCity(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -273,14 +284,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const subRoute = getSubRoute(req);
 
   if (subRoute.startsWith('city/')) {
+    parsePathParams(req, subRoute, /^city\/(.+)/, ['cityId']);
     return handleCity(req, res);
   } else if (subRoute.startsWith('cluster/')) {
+    parsePathParams(req, subRoute, /^cluster\/(.+)/, ['cluster']);
     return handleCluster(req, res);
   } else if (subRoute.startsWith('employee-details/')) {
+    parsePathParams(req, subRoute, /^employee-details\/(.+)/, ['employeeId']);
     return handleEmployeeDetails(req, res);
   } else if (subRoute.startsWith('my-rank/')) {
+    parsePathParams(req, subRoute, /^my-rank\/(.+)/, ['employeeId']);
     return handleMyRank(req, res);
   } else if (subRoute.startsWith('profile/')) {
+    parsePathParams(req, subRoute, /^profile\/(.+)/, ['employeeId']);
     return handleProfile(req, res);
   } else {
     return res.status(404).json({ error: 'Not found' });

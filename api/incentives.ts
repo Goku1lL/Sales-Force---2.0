@@ -11,6 +11,17 @@ function getSubRoute(req: VercelRequest): string {
   return match ? match[1] : '';
 }
 
+// Helper to parse path parameters and populate req.query
+function parsePathParams(req: VercelRequest, subRoute: string, pattern: RegExp, paramNames: string[]) {
+  const match = subRoute.match(pattern);
+  if (match) {
+    paramNames.forEach((name, index) => {
+      if (!req.query) req.query = {};
+      req.query[name] = match[index + 1];
+    });
+  }
+}
+
 // Handler: GET /api/incentives/breakdown/[employeeId]/[period]
 async function handleBreakdown(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -62,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const subRoute = getSubRoute(req);
 
   if (subRoute.startsWith('breakdown/')) {
+    parsePathParams(req, subRoute, /^breakdown\/([^/]+)\/([^/]+)/, ['employeeId', 'period']);
     return handleBreakdown(req, res);
   } else {
     return res.status(404).json({ error: 'Not found' });

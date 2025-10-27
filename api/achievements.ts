@@ -11,6 +11,17 @@ function getSubRoute(req: VercelRequest): string {
   return match ? match[1] : '';
 }
 
+// Helper to parse path parameters and populate req.query
+function parsePathParams(req: VercelRequest, subRoute: string, pattern: RegExp, paramNames: string[]) {
+  const match = subRoute.match(pattern);
+  if (match) {
+    paramNames.forEach((name, index) => {
+      if (!req.query) req.query = {};
+      req.query[name] = match[index + 1];
+    });
+  }
+}
+
 // Handler: GET /api/achievements/daily/[employeeId]/[date]
 async function handleDaily(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -153,12 +164,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Check for detailed routes first (more specific)
   if (subRoute.startsWith('detailed/daily/')) {
+    parsePathParams(req, subRoute, /^detailed\/daily\/([^/]+)\/([^/]+)/, ['employeeId', 'date']);
     return handleDetailedDaily(req, res);
   } else if (subRoute.startsWith('detailed/weekly/')) {
+    parsePathParams(req, subRoute, /^detailed\/weekly\/([^/]+)\/([^/]+)/, ['employeeId', 'yearweek']);
     return handleDetailedWeekly(req, res);
   } else if (subRoute.startsWith('daily/')) {
+    parsePathParams(req, subRoute, /^daily\/([^/]+)\/([^/]+)/, ['employeeId', 'date']);
     return handleDaily(req, res);
   } else if (subRoute.startsWith('weekly/')) {
+    parsePathParams(req, subRoute, /^weekly\/([^/]+)\/([^/]+)/, ['employeeId', 'yearweek']);
     return handleWeekly(req, res);
   } else {
     return res.status(404).json({ error: 'Not found' });

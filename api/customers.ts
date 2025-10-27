@@ -11,6 +11,17 @@ function getSubRoute(req: VercelRequest): string {
   return match ? match[1] : '';
 }
 
+// Helper to parse path parameters and populate req.query
+function parsePathParams(req: VercelRequest, subRoute: string, pattern: RegExp, paramNames: string[]) {
+  const match = subRoute.match(pattern);
+  if (match) {
+    paramNames.forEach((name, index) => {
+      if (!req.query) req.query = {};
+      req.query[name] = match[index + 1];
+    });
+  }
+}
+
 // Handler: GET /api/customers/assigned/[employeeId]
 async function handleAssigned(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -104,10 +115,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const subRoute = getSubRoute(req);
 
   if (subRoute.startsWith('assigned/')) {
+    parsePathParams(req, subRoute, /^assigned\/([^/]+)/, ['employeeId']); {
     return handleAssigned(req, res);
   } else if (subRoute.startsWith('high-value/')) {
+    parsePathParams(req, subRoute, /^high-value\/([^/]+)/, ['employeeId']); {
     return handleHighValue(req, res);
   } else if (subRoute.startsWith('inactive/')) {
+    parsePathParams(req, subRoute, /^inactive\/([^/]+)/, ['employeeId']); {
     return handleInactive(req, res);
   } else {
     return res.status(404).json({ error: 'Not found' });
