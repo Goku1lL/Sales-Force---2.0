@@ -1,7 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyToken, unauthorized, getPrisma, serverError } from '@sfa/shared';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+// Helper to extract sub-route from URL
+function getSubRoute(req: VercelRequest): string {
+  const url = req.url || '';
+  // Remove query string
+  const path = url.split('?')[0];
+  // Extract the part after /api/incentives/
+  const match = path.match(/\/api\/incentives\/(.+)/);
+  return match ? match[1] : '';
+}
+
+// Handler: GET /api/incentives/breakdown/[employeeId]/[period]
+async function handleBreakdown(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const employeeId = req.query.employeeId as string;
     const period = req.query.period as string;
-    
+
     if (!employeeId || !period) {
       return res.status(400).json({ error: 'employeeId and period are required' });
     }
@@ -43,5 +54,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json({ status: 'success', data: { period: 'daily', date: today, metrics: rows } });
   } catch (error) {
     return serverError(res, error);
+  }
+}
+
+// Main handler - routes to sub-handlers based on URL
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const subRoute = getSubRoute(req);
+
+  if (subRoute.startsWith('breakdown/')) {
+    return handleBreakdown(req, res);
+  } else {
+    return res.status(404).json({ error: 'Not found' });
   }
 }

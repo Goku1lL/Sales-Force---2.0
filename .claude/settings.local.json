@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/gokul/Documents/SnD/**)",
+      "Bash(cd:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix Vercel deployment: Resolve @sfa/shared module in API routes\n\n- Added TypeScript path mappings in tsconfig.api.json to resolve @sfa/shared\n- Included packages/shared/src in tsconfig.api.json to enable type checking\n- Updated build commands to build @sfa/shared package before frontend\n- Fixed JWT token verification type assertion in auth helper\n- Ensures shared package is compiled during Vercel deployment\n\nThis resolves the TypeScript compilation errors where API routes\ncouldn''t find the @sfa/shared module during Vercel''s build process.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix @sfa/shared build: Move TypeScript deps to dependencies\n\n- Moved @types/bcrypt, @types/jsonwebtoken, @types/node from devDependencies to dependencies\n- Moved typescript from devDependencies to dependencies\n- Ensures type definitions are available during Vercel production build\n\nThis fixes the build error where TypeScript couldn''t find type definitions\nfor jsonwebtoken because devDependencies were skipped in production mode.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(npx tsc --noEmit --project tsconfig.api.json)",
+      "Bash(git commit:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
