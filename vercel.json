@@ -1,14 +1,5 @@
 {
   "version": 2,
   "buildCommand": "npx prisma generate && pnpm install && pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
-  "functions": {
-    "api/*.ts": {
-      "runtime": "@vercel/node"
-    }
-  },
-  "rewrites": [
-    { "source": "/api/v1/:path*", "destination": "/api/:path*" },
-    { "source": "/(.*)", "destination": "/apps/frontend/dist/$1" }
-  ],
   "outputDirectory": "apps/frontend/dist"
 }
