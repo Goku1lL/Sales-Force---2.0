@@ -3,7 +3,7 @@
   "buildCommand": "npx prisma generate && pnpm install && pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
   "functions": {
     "api/**/*.ts": {
-      "runtime": "@vercel/node"
+      "runtime": "nodejs18.x"
     }
   },
   "rewrites": [
