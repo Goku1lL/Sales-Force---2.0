@@ -16,16 +16,16 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@sfa/shared": ["./packages/shared/src/index.ts"],
-      "@sfa/shared/*": ["./packages/shared/src/*"]
+      "@sfa/shared": ["./packages/shared/dist/index.d.ts"],
+      "@sfa/shared/*": ["./packages/shared/dist/*"]
     }
   },
   "include": [
-    "api/**/*",
-    "packages/shared/src/**/*"
+    "api/**/*"
   ],
   "exclude": [
     "node_modules",
-    "apps"
+    "apps",
+    "packages"
   ]
 }
