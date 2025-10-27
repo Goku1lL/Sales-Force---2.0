@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { getPrisma } from '../_lib/prisma';
-import { badRequest, serverError } from '../_lib/errors';
+import { getPrisma, badRequest, serverError } from '@sfa/shared';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
