@@ -8,8 +8,14 @@ export default defineConfig({
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json']
   },
   server: {
+    port: 5173,
     proxy: {
-      '/api': 'http://localhost:3000',
+      // Proxy all API requests to production Vercel deployment for now
+      '/api': {
+        target: 'https://sales-force-2-0.vercel.app',
+        changeOrigin: true,
+        rewrite: (path) => path
+      }
     }
   }
 });
