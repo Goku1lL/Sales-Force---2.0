@@ -7,7 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "pnpm --filter @sfa/frontend dev",
+    "dev": "vercel dev",
+    "dev:frontend": "pnpm --filter @sfa/frontend dev",
     "build": "pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
     "start": "pnpm --filter @sfa/frontend preview",
     "lint": "echo \"No lint at root\""
