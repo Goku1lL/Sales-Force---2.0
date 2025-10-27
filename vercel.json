@@ -4,17 +4,7 @@
   "devCommand": "cd apps/frontend && npx vite",
   "outputDirectory": "apps/frontend/dist",
   "framework": "vite",
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "@vercel/node@3.0.0"
-    }
-  },
   "rewrites": [
     { "source": "/api/v1/:path*", "destination": "/api/:path*" }
-  ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/api/.*", "dest": "/api" },
-    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
