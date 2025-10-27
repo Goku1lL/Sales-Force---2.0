@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyToken, unauthorized } from '../../../../../../_lib/auth';
-import { getPrisma } from '../../../../../../_lib/prisma';
-import { serverError } from '../../../../../../_lib/errors';
+import { verifyToken, unauthorized } from '../../../../../_lib/auth';
+import { getPrisma } from '../../../../../_lib/prisma';
+import { serverError } from '../../../../../_lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
