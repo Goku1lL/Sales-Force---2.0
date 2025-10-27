@@ -170,16 +170,6 @@ importers:
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
-      '@vercel/node':
-        specifier: ^3.0.0
-        version: 3.2.29
-      bcrypt:
-        specifier: ^5.1.1
-        version: 5.1.1
-      jsonwebtoken:
-        specifier: ^9.0.2
-        version: 9.0.2
-    devDependencies:
       '@types/bcrypt':
         specifier: ^5.0.2
         version: 5.0.2
@@ -189,6 +179,15 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.23
+      '@vercel/node':
+        specifier: ^3.0.0
+        version: 3.2.29
+      bcrypt:
+        specifier: ^5.1.1
+        version: 5.1.1
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
