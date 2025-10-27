@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@sfa/shared": "workspace:*",
     "@types/node": "^20.0.0",
     "@vercel/node": "^3.0.0",
     "bcrypt": "^5.1.1",

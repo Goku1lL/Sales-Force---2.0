@@ -13,19 +13,13 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "declaration": false,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@sfa/shared": ["./packages/shared/dist/index.d.ts"],
-      "@sfa/shared/*": ["./packages/shared/dist/*"]
-    }
+    "noEmit": true
   },
   "include": [
     "api/**/*"
   ],
   "exclude": [
     "node_modules",
-    "apps",
-    "packages"
+    "apps"
   ]
 }
