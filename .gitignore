@@ -54,3 +54,7 @@ CURSOR_PROMPT_SALES_APP.md
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Deployment and local config
+.vercel
+.claude/settings.local.json
