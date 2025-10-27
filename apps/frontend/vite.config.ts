@@ -10,9 +10,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy all API requests to production Vercel deployment for now
+      // Proxy all API requests to local backend server
       '/api': {
-        target: 'https://sales-force-2-0.vercel.app',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         rewrite: (path) => path
       }
