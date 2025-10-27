@@ -115,13 +115,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const subRoute = getSubRoute(req);
 
   if (subRoute.startsWith('assigned/')) {
-    parsePathParams(req, subRoute, /^assigned\/([^/]+)/, ['employeeId']); {
+    parsePathParams(req, subRoute, /^assigned\/([^/]+)/, ['employeeId']);
     return handleAssigned(req, res);
   } else if (subRoute.startsWith('high-value/')) {
-    parsePathParams(req, subRoute, /^high-value\/([^/]+)/, ['employeeId']); {
+    parsePathParams(req, subRoute, /^high-value\/([^/]+)/, ['employeeId']);
     return handleHighValue(req, res);
   } else if (subRoute.startsWith('inactive/')) {
-    parsePathParams(req, subRoute, /^inactive\/([^/]+)/, ['employeeId']); {
+    parsePathParams(req, subRoute, /^inactive\/([^/]+)/, ['employeeId']);
     return handleInactive(req, res);
   } else {
     return res.status(404).json({ error: 'Not found' });

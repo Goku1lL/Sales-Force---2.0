@@ -190,19 +190,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Check for detailed routes first (more specific)
   if (subRoute.startsWith('detailed/daily/')) {
-    parsePathParams(req, subRoute, /^detailed\/daily\/([^/]+)\/([^/]+)/, ['employeeId', 'date']); {
+    parsePathParams(req, subRoute, /^detailed\/daily\/([^/]+)\/([^/]+)/, ['employeeId', 'date']);
     return handleDetailedDaily(req, res);
   } else if (subRoute.startsWith('detailed/weekly/')) {
-    parsePathParams(req, subRoute, /^detailed\/weekly\/([^/]+)\/([^/]+)/, ['employeeId', 'yearweek']); {
+    parsePathParams(req, subRoute, /^detailed\/weekly\/([^/]+)\/([^/]+)/, ['employeeId', 'yearweek']);
     return handleDetailedWeekly(req, res);
   } else if (subRoute.startsWith('history/')) {
-    parsePathParams(req, subRoute, /^history\/([^/]+)/, ['employeeId']); {
+    parsePathParams(req, subRoute, /^history\/([^/]+)/, ['employeeId']);
     return handleHistory(req, res);
   } else if (subRoute.startsWith('daily/')) {
-    parsePathParams(req, subRoute, /^daily\/([^/]+)\/([^/]+)/, ['employeeId', 'date']); {
+    parsePathParams(req, subRoute, /^daily\/([^/]+)\/([^/]+)/, ['employeeId', 'date']);
     return handleDaily(req, res);
   } else if (subRoute.startsWith('weekly/')) {
-    parsePathParams(req, subRoute, /^weekly\/([^/]+)\/([^/]+)/, ['employeeId', 'yearweek']); {
+    parsePathParams(req, subRoute, /^weekly\/([^/]+)\/([^/]+)/, ['employeeId', 'yearweek']);
     return handleWeekly(req, res);
   } else {
     return res.status(404).json({ error: 'Not found' });
