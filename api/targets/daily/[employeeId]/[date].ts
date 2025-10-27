@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyToken, unauthorized } from '../../../_lib/auth';
-import { getPrisma } from '../../../_lib/prisma';
-import { serverError } from '../../../_lib/errors';
+import { verifyToken, unauthorized } from '../_lib/auth';
+import { getPrisma } from '../_lib/prisma';
+import { serverError } from '../_lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const prisma = getPrisma();
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows: any[] = await prisma.$queryRawUnsafe(
       `SELECT * FROM DayTargets WHERE employee_id = ? AND date = ? AND deleted = 0 ORDER BY metric`,
       String(employeeId), date
     );

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyToken, unauthorized } from '../../../_lib/auth';
-import { getPrisma } from '../../../_lib/prisma';
-import { serverError } from '../../../_lib/errors';
+import { verifyToken, unauthorized } from '../_lib/auth';
+import { getPrisma } from '../_lib/prisma';
+import { serverError } from '../_lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -22,12 +22,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const prisma = getPrisma();
 
     if (period === 'weekly') {
-      const yearweekRows = await prisma.$queryRawUnsafe<any[]>(
+      const yearweekRows: any[] = await prisma.$queryRawUnsafe(
         `SELECT MAX(yearweek) as yw FROM WeekAchievement WHERE employee_id = ? AND deleted = 0`,
         Number(employeeId)
       );
       const yw = yearweekRows?.[0]?.yw;
-      const rows = await prisma.$queryRawUnsafe<any[]>(
+      const rows: any[] = await prisma.$queryRawUnsafe(
         `SELECT metric, SUM(variable_pay) as variable_pay, SUM(contribution) as contribution
          FROM WeekAchievement WHERE employee_id = ? AND yearweek = ? AND deleted = 0 GROUP BY metric`,
         Number(employeeId), yw
@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // default daily
     const today = new Date().toISOString().slice(0, 10);
-    const rows = await prisma.$queryRawUnsafe<any[]>(
+    const rows: any[] = await prisma.$queryRawUnsafe(
       `SELECT metric, SUM(variable_pay) as variable_pay, SUM(contribution) as contribution
        FROM DayAchievement WHERE employee_id = ? AND date = ? AND deleted = 0 GROUP BY metric`,
       Number(employeeId), today

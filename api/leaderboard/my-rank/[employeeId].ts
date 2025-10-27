@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyToken, unauthorized } from '../../../_lib/auth';
-import { getPrisma } from '../../../_lib/prisma';
-import { serverError } from '../../../_lib/errors';
+import { verifyToken, unauthorized } from '../_lib/auth';
+import { getPrisma } from '../_lib/prisma';
+import { serverError } from '../_lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const prisma = getPrisma();
 
     // Get employee cluster first
-    const employee = await prisma.$queryRawUnsafe<any[]>(
+    const employee: any[] = await prisma.$queryRawUnsafe(
       `SELECT cluster FROM Executive WHERE employee_id = ? AND deleted = 0 LIMIT 1`,
       employeeId
     );
@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const cluster = employee[0].cluster || 'Unknown';
 
     // Calculate ranking within cluster
-    const clusterRanking = await prisma.$queryRawUnsafe<any[]>(
+    const clusterRanking: any[] = await prisma.$queryRawUnsafe(
       `SELECT @rank := @rank + 1 as rank, t.*
        FROM (
          SELECT

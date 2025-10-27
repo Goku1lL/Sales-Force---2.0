@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Get recent sales achievements from today
     const today = new Date().toISOString().slice(0, 10);
 
-    const recentAchievements = await prisma.$queryRawUnsafe<any[]>(`
+    const recentAchievements: any[] = await prisma.$queryRawUnsafe(`
       SELECT
         da.employee_id,
         da.Achievement,

@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!email) return badRequest(res, 'email required');
     
     const prisma = getPrisma();
-    const user = await prisma.$queryRawUnsafe<any[]>(`SELECT Id, email FROM SalesApp_Login WHERE email = ? AND deleted = 0 LIMIT 1`, email);
+    const user: any[] = await prisma.$queryRawUnsafe(`SELECT Id, email FROM SalesApp_Login WHERE email = ? AND deleted = 0 LIMIT 1`, email);
     if (!user.length) return res.json({ message: 'If the email exists, a reset link has been sent' });
 
     const secret = process.env.JWT_SECRET as string;

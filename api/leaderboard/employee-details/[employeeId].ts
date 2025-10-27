@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyToken, unauthorized } from '../../../_lib/auth';
-import { getPrisma } from '../../../_lib/prisma';
-import { serverError } from '../../../_lib/errors';
+import { verifyToken, unauthorized } from '../_lib/auth';
+import { getPrisma } from '../_lib/prisma';
+import { serverError } from '../_lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const prisma = getPrisma();
 
     // Get employee basic info
-    const employee = await prisma.$queryRawUnsafe<any[]>(
+    const employee: any[] = await prisma.$queryRawUnsafe(
       `SELECT e.Id, e.Name, e.cluster, e.CityId, cd.City as city_name
        FROM Executive e
        LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Get daily achievements for today
     const today = new Date().toISOString().slice(0, 10);
-    const dailyAchievements = await prisma.$queryRawUnsafe<any[]>(
+    const dailyAchievements: any[] = await prisma.$queryRawUnsafe(
       `SELECT dt.metric, dt.target, da.Achievement, da.variable_pay
        FROM DayTargets dt
        LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
 
     // Get weekly achievements for current week
-    const weeklyAchievements = await prisma.$queryRawUnsafe<any[]>(
+    const weeklyAchievements: any[] = await prisma.$queryRawUnsafe(
       `SELECT wt.metric, wt.target, wa.Achievement, wa.variable_pay
        FROM WeekTargets wt
        LEFT JOIN WeekAchievement wa ON wt.employee_id = wa.employee_id

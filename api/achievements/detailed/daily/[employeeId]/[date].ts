@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyToken, unauthorized } from '../../../../_lib/auth';
-import { getPrisma } from '../../../../_lib/prisma';
-import { serverError } from '../../../../_lib/errors';
+import { verifyToken, unauthorized } from '../../_lib/auth';
+import { getPrisma } from '../../_lib/prisma';
+import { serverError } from '../../_lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const prisma = getPrisma();
     
     // Get all day achievements for the employee and date
-    const allAchievements = await prisma.$queryRawUnsafe<any[]>(`
+    const allAchievements: any[] = await prisma.$queryRawUnsafe(`
       SELECT
         employee_id,
         date,

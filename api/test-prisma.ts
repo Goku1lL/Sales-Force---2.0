@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { getPrisma } from './_lib/prisma';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -9,6 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const prisma = getPrisma();
     // Test Prisma connection
     await prisma.$connect();
     
