@@ -8,10 +8,10 @@
   ],
   "scripts": {
     "dev": "pnpm --filter @sfa/frontend dev",
-    "build": "pnpm --filter @sfa/frontend build",
+    "build": "pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
     "start": "pnpm --filter @sfa/frontend preview",
     "lint": "echo \"No lint at root\"",
-    "vercel-build": "npx prisma generate && pnpm install && pnpm run build"
+    "vercel-build": "npx prisma generate && pnpm install && pnpm --filter @sfa/shared build && pnpm run build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

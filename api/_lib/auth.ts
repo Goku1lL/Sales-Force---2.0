@@ -9,7 +9,9 @@ export function verifyToken(req: VercelRequest): { sub: number; role: string } |
   const secret = process.env.JWT_SECRET as string;
   
   try {
-    return jwt.verify(token, secret) as { sub: number; role: string };
+    const decoded = jwt.verify(token, secret);
+    if (typeof decoded === 'string') return null;
+    return decoded as unknown as { sub: number; role: string };
   } catch {
     return null;
   }

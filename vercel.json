@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npx prisma generate && pnpm install && pnpm run build",
+  "buildCommand": "npx prisma generate && pnpm install && pnpm --filter @sfa/shared build && pnpm run build",
   "outputDirectory": "apps/frontend/dist",
   "framework": "vite",
   "rewrites": [
