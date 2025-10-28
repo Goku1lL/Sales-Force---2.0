@@ -12,66 +12,58 @@ router.get('/summary', async (req, res, next) => {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // Get daily targets and achievements - start with targets to ensure we always get them
-    // First try with slab_Segment join
-    let dailyData = await prisma.$queryRawUnsafe<any[]>(
+    // Get daily targets and achievements - achievements are raw numbers, not slab-specific
+    const dailyData = await prisma.$queryRawUnsafe<any[]>(
       `SELECT
         dt.metric,
         dt.target,
+        dt.slab_Segment,
+        dt.incentive_percent,
         COALESCE(da.Achievement, 0) as achievement,
-        COALESCE(da.variable_pay, 0) as variable_pay,
-        dt.slab_Segment as target_slab,
-        da.slab_Segment as achievement_slab
+        COALESCE(da.variable_pay, 0) as variable_pay
        FROM DayTargets dt
        LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
          AND dt.date = da.date
          AND dt.metric = da.metric
-         AND dt.slab_Segment = da.slab_Segment
          AND da.deleted = 0
        WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0`,
       employeeId, today
     );
 
-    // If no achievements found with slab_Segment join, try without it
-    const totalAchievements = dailyData.reduce((sum, row) => sum + Number(row.achievement || 0), 0);
-    if (totalAchievements === 0) {
-      console.log('No achievements found with slab_Segment join, trying without...');
-      dailyData = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT
-          dt.metric,
-          dt.target,
-          COALESCE(da.Achievement, 0) as achievement,
-          COALESCE(da.variable_pay, 0) as variable_pay,
-          dt.slab_Segment as target_slab,
-          da.slab_Segment as achievement_slab
-         FROM DayTargets dt
-         LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
-           AND dt.date = da.date
-           AND dt.metric = da.metric
-           AND da.deleted = 0
-         WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0`,
-        employeeId, today
-      );
-    }
+    // Group by metric and calculate achievements vs targets properly
+    const metricGroups = dailyData.reduce((groups: Record<string, any>, row) => {
+      const metric = row.metric;
+      if (!groups[metric]) {
+        groups[metric] = {
+          metric,
+          totalAchievement: 0,
+          targets: [],
+          totalTarget: 0,
+          totalEarnings: 0
+        };
+      }
+      
+      // Sum achievements (they're raw numbers, not slab-specific)
+      groups[metric].totalAchievement += Number(row.achievement || 0);
+      groups[metric].totalEarnings += Number(row.variable_pay || 0);
+      
+      // Store targets with their slab info
+      groups[metric].targets.push({
+        slab: row.slab_Segment,
+        target: Number(row.target || 0),
+        incentive_percent: Number(row.incentive_percent || 0)
+      });
+      
+      // Sum total target (highest slab target)
+      groups[metric].totalTarget = Math.max(groups[metric].totalTarget, Number(row.target || 0));
+      
+      return groups;
+    }, {});
 
-    // Debug logging to see what data we're getting
-    console.log('=== DAILY DATA DEBUG ===');
-    console.log('Employee ID:', employeeId);
-    console.log('Date:', today);
-    console.log('Raw daily data:', JSON.stringify(dailyData, null, 2));
-
-    // Let's also check if there are any achievements at all for this employee/date
-    const rawAchievements = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM DayAchievement 
-       WHERE employee_id = ? AND date = ? AND deleted = 0`,
-      employeeId, today
-    );
-    console.log('Raw achievements from DayAchievement table:', JSON.stringify(rawAchievements, null, 2));
-
-    // Calculate performance-based percentages (achievement vs target in units)
-    const todayAchievement = dailyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
-    const todayTargetUnits = dailyData.reduce((a, r) => a + Number(r.target || 0), 0);
-    let todayEarnings = dailyData.reduce((a, r) => a + Number(r.variable_pay || 0), 0);
+    // Calculate total achievements and targets across all metrics
+    const todayAchievement = Object.values(metricGroups).reduce((sum: number, group: any) => sum + group.totalAchievement, 0);
+    const todayTargetUnits = Object.values(metricGroups).reduce((sum: number, group: any) => sum + group.totalTarget, 0);
+    let todayEarnings = Object.values(metricGroups).reduce((sum: number, group: any) => sum + group.totalEarnings, 0);
 
     // Calculate potential earnings based on earning rates per unit
     // AB: ₹10/unit, GT OC: ₹50/unit, Fruits OC: ₹100/unit
@@ -84,18 +76,19 @@ router.get('/summary', async (req, res, next) => {
       return total + (target * rate);
     }, 0);
 
-    // Get weekly targets and achievements - start with targets to ensure we always get them
+    // Get weekly targets and achievements - achievements are raw numbers, not slab-specific
     const weeklyData = await prisma.$queryRawUnsafe<any[]>(
       `SELECT
         wt.metric,
         wt.target,
+        wt.slab_Segment,
+        wt.incentive_percent,
         COALESCE(wa.Achievement, 0) as achievement,
         COALESCE(wa.variable_pay, 0) as variable_pay
        FROM WeekTargets wt
        LEFT JOIN WeekAchievement wa ON wt.employee_id = wa.employee_id
          AND wt.yearweek = wa.yearweek
          AND wt.metric = wa.metric
-         AND wt.slab_Segment = wa.slab_Segment
          AND wa.deleted = 0
        WHERE wt.employee_id = ? AND wt.yearweek = (
          SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
@@ -103,10 +96,32 @@ router.get('/summary', async (req, res, next) => {
       employeeId, employeeId
     );
 
-    // Calculate performance-based percentages (achievement vs target in units)
-    const weeklyAchievement = weeklyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
-    const weeklyTargetUnits = weeklyData.reduce((a, r) => a + Number(r.target || 0), 0);
-    let weeklyEarnings = weeklyData.reduce((a, r) => a + Number(r.variable_pay || 0), 0);
+    // Group weekly data by metric and calculate properly
+    const weeklyMetricGroups = weeklyData.reduce((groups: Record<string, any>, row) => {
+      const metric = row.metric;
+      if (!groups[metric]) {
+        groups[metric] = {
+          metric,
+          totalAchievement: 0,
+          totalTarget: 0,
+          totalEarnings: 0
+        };
+      }
+      
+      // Sum achievements (they're raw numbers, not slab-specific)
+      groups[metric].totalAchievement += Number(row.achievement || 0);
+      groups[metric].totalEarnings += Number(row.variable_pay || 0);
+      
+      // Sum total target (highest slab target)
+      groups[metric].totalTarget = Math.max(groups[metric].totalTarget, Number(row.target || 0));
+      
+      return groups;
+    }, {});
+
+    // Calculate total achievements and targets across all metrics
+    const weeklyAchievement = Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.totalAchievement, 0);
+    const weeklyTargetUnits = Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.totalTarget, 0);
+    let weeklyEarnings = Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.totalEarnings, 0);
 
     // Calculate potential earnings based on earning rates per unit
     // AB: ₹10/unit, GT OC: ₹50/unit, Fruits OC: ₹100/unit
