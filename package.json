@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm install && cd apps/backend && npm run build",
+    "build": "npm install && npx prisma generate --schema=./prisma/schema.prisma && cd apps/backend && npm run build",
     "start": "cd apps/backend && npm start",
     "lint": "echo \"No lint at root\""
   },
