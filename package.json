@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
-    "start": "pnpm --filter @sfa/frontend preview",
+    "build": "cd apps/backend && npm run build",
+    "start": "cd apps/backend && npm start",
     "lint": "echo \"No lint at root\""
   },
   "dependencies": {
