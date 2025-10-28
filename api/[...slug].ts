@@ -63,21 +63,99 @@ async function handleDashboardSummary(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Mock data for testing
-  const summary = {
-    dailyPercent: 85.5,
-    weeklyPercent: 92.3,
-    todayTarget: 100,
-    todayAchievement: 85,
-    todayEarnings: 4250,
-    todayPotentialEarnings: 5000,
-    weeklyTarget: 700,
-    weeklyAchievement: 646,
-    weeklyEarnings: 32300,
-    weeklyPotentialEarnings: 35000,
-  };
+  try {
+    const { employeeId } = req.query;
 
-  return res.status(200).json({ data: summary });
+    if (!employeeId || typeof employeeId !== 'string') {
+      return res.status(400).json({ error: 'employeeId is required' });
+    }
+
+    const prisma = await getPrismaClient();
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Get daily targets and achievements
+    const dailyData = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        dt.metric,
+        dt.target,
+        COALESCE(da.Achievement, 0) as achievement,
+        COALESCE(da.variable_pay, 0) as variable_pay
+       FROM DayTargets dt
+       LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
+         AND dt.date = da.date
+         AND dt.metric = da.metric
+         AND da.deleted = 0
+       WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0`,
+      employeeId, today
+    );
+
+    // Calculate performance-based percentages
+    const todayAchievement = dailyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
+    const todayTargetUnits = dailyData.reduce((a, r) => a + Number(r.target || 0), 0);
+    let todayEarnings = dailyData.reduce((a, r) => a + Number(r.variable_pay || 0), 0);
+
+    // Calculate potential earnings based on earning rates per unit
+    const todayPotentialEarnings = dailyData.reduce((total, r) => {
+      const target = Number(r.target || 0);
+      let rate = 0;
+      if (r.metric === 'AB') rate = 10;
+      else if (r.metric === 'GT OC') rate = 50;
+      else if (r.metric === 'Fruits OC') rate = 100;
+      return total + (target * rate);
+    }, 0);
+
+    // Get weekly targets and achievements
+    const weeklyData = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        wt.metric,
+        wt.target,
+        COALESCE(wa.Achievement, 0) as achievement,
+        COALESCE(wa.variable_pay, 0) as variable_pay
+       FROM WeekTargets wt
+       LEFT JOIN WeekAchievement wa ON wt.employee_id = wa.employee_id
+         AND wt.yearweek = wa.yearweek
+         AND wt.metric = wa.metric
+         AND wa.deleted = 0
+       WHERE wt.employee_id = ? AND wt.yearweek = YEARWEEK(NOW()) AND wt.deleted = 0`,
+      employeeId
+    );
+
+    const weeklyAchievement = weeklyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
+    const weeklyTargetUnits = weeklyData.reduce((a, r) => a + Number(r.target || 0), 0);
+    let weeklyEarnings = weeklyData.reduce((a, r) => a + Number(r.variable_pay || 0), 0);
+
+    const weeklyPotentialEarnings = weeklyData.reduce((total, r) => {
+      const target = Number(r.target || 0);
+      let rate = 0;
+      if (r.metric === 'AB') rate = 10;
+      else if (r.metric === 'GT OC') rate = 50;
+      else if (r.metric === 'Fruits OC') rate = 100;
+      return total + (target * rate);
+    }, 0);
+
+    // Calculate percentages
+    const dailyPercent = todayTargetUnits > 0 ? (todayAchievement / todayTargetUnits) * 100 : 0;
+    const weeklyPercent = weeklyTargetUnits > 0 ? (weeklyAchievement / weeklyTargetUnits) * 100 : 0;
+
+    const summary = {
+      dailyPercent: Math.round(dailyPercent * 100) / 100,
+      weeklyPercent: Math.round(weeklyPercent * 100) / 100,
+      todayTarget: todayTargetUnits,
+      todayAchievement,
+      todayEarnings,
+      todayPotentialEarnings,
+      weeklyTarget: weeklyTargetUnits,
+      weeklyAchievement,
+      weeklyEarnings,
+      weeklyPotentialEarnings,
+    };
+
+    return res.status(200).json({ data: summary });
+  } catch (error) {
+    console.error('Dashboard summary error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 async function handleUrgentActions(req: any, res: any) {
@@ -85,37 +163,44 @@ async function handleUrgentActions(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { employeeId } = req.query;
+  try {
+    const { employeeId } = req.query;
 
-  if (!employeeId || typeof employeeId !== 'string') {
-    return res.status(400).json({ error: 'employeeId is required' });
+    if (!employeeId || typeof employeeId !== 'string') {
+      return res.status(400).json({ error: 'employeeId is required' });
+    }
+
+    const prisma = await getPrismaClient();
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Get urgent actions - customers who haven't been contacted recently
+    const urgentActions = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        c.Id,
+        c.customername,
+        c.contactnumber,
+        c.Priority,
+        c.LastOrder,
+        c.LastOpened,
+        CASE
+          WHEN c.LastOrder IS NULL OR c.LastOrder > 30 THEN 'High Priority - No recent orders'
+          WHEN c.LastOrder > 14 THEN 'Medium Priority - Stale orders'
+          ELSE 'Low Priority'
+        END as urgency_reason
+       FROM SA_HomePageTargetCustomers c
+       WHERE c.employee_id = ?
+         AND (c.LastOrder IS NULL OR c.LastOrder > 14)
+       ORDER BY c.Priority ASC, c.LastOrder DESC
+       LIMIT 10`,
+      employeeId
+    );
+
+    return res.status(200).json({ data: urgentActions });
+  } catch (error) {
+    console.error('Urgent actions error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Get urgent actions - customers who haven't been contacted recently
-  const urgentActions = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT
-      c.Id,
-      c.customername,
-      c.contactnumber,
-      c.Priority,
-      c.LastOrder,
-      c.LastOpened,
-      CASE
-        WHEN c.LastOrder IS NULL OR c.LastOrder > 30 THEN 'High Priority - No recent orders'
-        WHEN c.LastOrder > 14 THEN 'Medium Priority - Stale orders'
-        ELSE 'Low Priority'
-      END as urgency_reason
-     FROM SA_HomePageTargetCustomers c
-     WHERE c.employee_id = ?
-       AND (c.LastOrder IS NULL OR c.LastOrder > 14)
-     ORDER BY c.Priority ASC, c.LastOrder DESC
-     LIMIT 10`,
-    employeeId
-  );
-
-  return res.status(200).json({ data: urgentActions });
 }
 
 async function handleNearbyOpportunities(req: any, res: any) {
@@ -123,27 +208,35 @@ async function handleNearbyOpportunities(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get nearby opportunities - high-value customers with recent activity
-  const nearbyOpportunities = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT
-      c.Id,
-      c.customername,
-      c.contactnumber,
-      c.Priority,
-      c.LastOrder,
-      c.LastOpened,
-      CASE
-        WHEN c.LastOrder <= 7 THEN 'Recent Activity'
-        WHEN c.LastOrder <= 14 THEN 'Moderate Activity'
-        ELSE 'Low Activity'
-      END as activity_level
-     FROM SA_HomePageHighValueCustomers c
-     WHERE c.LastOrder <= 14
-     ORDER BY c.Priority ASC, c.LastOrder ASC
-     LIMIT 10`
-  );
+  try {
+    const prisma = await getPrismaClient();
 
-  return res.status(200).json({ data: nearbyOpportunities });
+
+    // Get nearby opportunities - high-value customers with recent activity
+    const nearbyOpportunities = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        c.Id,
+        c.customername,
+        c.contactnumber,
+        c.Priority,
+        c.LastOrder,
+        c.LastOpened,
+        CASE
+          WHEN c.LastOrder <= 7 THEN 'Recent Activity'
+          WHEN c.LastOrder <= 14 THEN 'Moderate Activity'
+          ELSE 'Low Activity'
+        END as activity_level
+       FROM SA_HomePageHighValueCustomers c
+       WHERE c.LastOrder <= 14
+       ORDER BY c.Priority ASC, c.LastOrder ASC
+       LIMIT 10`
+    );
+
+    return res.status(200).json({ data: nearbyOpportunities });
+  } catch (error) {
+    console.error('Nearby opportunities error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 async function handleLiveActivity(req: any, res: any) {
@@ -151,38 +244,46 @@ async function handleLiveActivity(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get live activity - recent achievements and activities
-  const liveActivity = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT
-      e.name as employee_name,
-      e.cluster,
-      da.metric,
-      da.Achievement,
-      da.date,
-      'Daily Achievement' as activity_type
-     FROM DayAchievement da
-     JOIN Executive e ON da.employee_id = e.employee_id
-     WHERE da.date = CURDATE() AND da.deleted = 0
-     ORDER BY da.created_at DESC
-     LIMIT 10
+  try {
+    const prisma = await getPrismaClient();
 
-     UNION ALL
 
-     SELECT
-      e.name as employee_name,
-      e.cluster,
-      wa.metric,
-      wa.Achievement,
-      wa.yearweek as date,
-      'Weekly Achievement' as activity_type
-     FROM WeekAchievement wa
-     JOIN Executive e ON wa.employee_id = e.employee_id
-     WHERE wa.yearweek = YEARWEEK(NOW()) AND wa.deleted = 0
-     ORDER BY wa.created_at DESC
-     LIMIT 10`
-  );
+    // Get live activity - recent achievements and activities
+    const liveActivity = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        e.name as employee_name,
+        e.cluster,
+        da.metric,
+        da.Achievement,
+        da.date,
+        'Daily Achievement' as activity_type
+       FROM DayAchievement da
+       JOIN Executive e ON da.employee_id = e.employee_id
+       WHERE da.date = CURDATE() AND da.deleted = 0
+       ORDER BY da.created_at DESC
+       LIMIT 10
 
-  return res.status(200).json({ data: liveActivity });
+       UNION ALL
+
+       SELECT
+        e.name as employee_name,
+        e.cluster,
+        wa.metric,
+        wa.Achievement,
+        wa.yearweek as date,
+        'Weekly Achievement' as activity_type
+       FROM WeekAchievement wa
+       JOIN Executive e ON wa.employee_id = e.employee_id
+       WHERE wa.yearweek = YEARWEEK(NOW()) AND wa.deleted = 0
+       ORDER BY wa.created_at DESC
+       LIMIT 10`
+    );
+
+    return res.status(200).json({ data: liveActivity });
+  } catch (error) {
+    console.error('Live activity error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 async function handleLeaderboardProfile(req: any, res: any, cleanPath: string) {
@@ -190,39 +291,51 @@ async function handleLeaderboardProfile(req: any, res: any, cleanPath: string) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  try {
+    const prisma = await getPrismaClient();
+
   const employeeId = cleanPath.split('/').pop();
 
-  if (!employeeId || typeof employeeId !== 'string') {
-    return res.status(400).json({ error: 'employeeId is required' });
+    if (!employeeId || typeof employeeId !== 'string') {
+      return res.status(400).json({ error: 'employeeId is required' });
+    }
+
+    const prisma = await getPrismaClient();
+
+
+    // Get employee profile
+    const employee = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        e.employee_id,
+        e.name,
+        e.cluster,
+        e.city,
+        e.CityId,
+        e.variable_pay,
+        e.cluster_rank,
+        e.city_rank
+       FROM Executive e
+       WHERE e.employee_id = ?`,
+      employeeId
+    );
+
+    if (employee.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    return res.status(200).json({ data: employee[0] });
+  } catch (error) {
+    console.error('Leaderboard profile error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  // Get employee profile
-  const employee = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT
-      e.employee_id,
-      e.name,
-      e.cluster,
-      e.city,
-      e.CityId,
-      e.variable_pay,
-      e.cluster_rank,
-      e.city_rank
-     FROM Executive e
-     WHERE e.employee_id = ?`,
-    employeeId
-  );
-
-  if (employee.length === 0) {
-    return res.status(404).json({ error: 'Employee not found' });
-  }
-
-  return res.status(200).json({ data: employee[0] });
 }
 
 async function handleEmployeeDetails(req: any, res: any, cleanPath: string) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const prisma = await getPrismaClient();
 
   const employeeId = cleanPath.split('/').pop();
 
@@ -309,6 +422,11 @@ async function handleEmployeeDetails(req: any, res: any, cleanPath: string) {
   };
 
   return res.status(200).json({ data: response });
+  } catch (error) {
+    console.error('Employee details error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
 }
 
 async function handleAssignedCustomers(req: any, res: any, cleanPath: string) {
@@ -316,35 +434,57 @@ async function handleAssignedCustomers(req: any, res: any, cleanPath: string) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  try {
+    const prisma = await getPrismaClient();
+
   const employeeId = cleanPath.split('/').pop();
 
-  if (!employeeId || typeof employeeId !== 'string') {
-    return res.status(400).json({ error: 'employeeId is required' });
+    if (!employeeId || typeof employeeId !== 'string') {
+      return res.status(400).json({ error: 'employeeId is required' });
+    }
+
+    const prisma = await getPrismaClient();
+
+    // Get assigned customers
+    const customers = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        Id,
+        customername,
+        description,
+        contactnumber,
+        Priority,
+        LastOrder,
+        LastOpened
+       FROM SA_HomePageTargetCustomers
+       WHERE employee_id = ?
+       ORDER BY Priority ASC, LastOrder DESC`,
+      employeeId
+    );
+
+    return res.status(200).json({ data: customers });
+  } catch (error) {
+    console.error('High-value customers error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  // Get assigned customers
-  const customers = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT
-      Id,
-      customername,
-      description,
-      contactnumber,
-      Priority,
-      LastOrder,
-      LastOpened
-     FROM SA_HomePageTargetCustomers
-     WHERE employee_id = ?
-     ORDER BY Priority ASC, LastOrder DESC`,
-    employeeId
-  );
-
-  return res.status(200).json({ data: customers });
+}
+  } catch (error) {
+    console.error('Inactive customers error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+  } catch (error) {
+    console.error('Assigned customers error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 async function handleInactiveCustomers(req: any, res: any, cleanPath: string) {
+  try {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const prisma = await getPrismaClient();
 
   const employeeId = cleanPath.split('/').pop();
 
@@ -369,12 +509,25 @@ async function handleInactiveCustomers(req: any, res: any, cleanPath: string) {
   );
 
   return res.status(200).json({ data: customers });
+  } catch (error) {
+    console.error('High-value customers error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+  } catch (error) {
+    console.error('Inactive customers error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
 }
 
 async function handleHighValueCustomers(req: any, res: any, cleanPath: string) {
+  try {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const prisma = await getPrismaClient();
 
   const employeeId = cleanPath.split('/').pop();
 
@@ -399,4 +552,14 @@ async function handleHighValueCustomers(req: any, res: any, cleanPath: string) {
   );
 
   return res.status(200).json({ data: customers });
+  } catch (error) {
+    console.error('High-value customers error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+  } catch (error) {
+    console.error('Inactive customers error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
 }
