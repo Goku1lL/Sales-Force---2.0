@@ -1,22 +1,22 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { IncomingMessage, ServerResponse } from 'http';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: IncomingMessage req: VercelRequest, res: VercelResponse { query: Record<string, string | string[]> }, res: ServerResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' });
   }
 
   try {
     const { cityId, period } = req.query;
     
     if (!cityId || typeof cityId !== 'string') {
-      return res.status(400).json({ error: 'cityId is required' });
+      res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'cityId is required' });
     }
 
     if (!period || typeof period !== 'string' || !['day', 'week'].includes(period)) {
-      return res.status(400).json({ error: 'period must be day or week' });
+      res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'period must be day or week' });
     }
 
     let query = '';
@@ -62,9 +62,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const leaderboard = await prisma.$queryRawUnsafe<any[]>(query, parseInt(cityId));
 
-    res.status(200).json({ data: leaderboard });
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: leaderboard });
   } catch (error) {
     console.error('City leaderboard error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Internal server error' });
   }
 }

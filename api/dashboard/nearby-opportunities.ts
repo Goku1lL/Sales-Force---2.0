@@ -1,11 +1,11 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { IncomingMessage, ServerResponse } from 'http';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: IncomingMessage & { query: Record<string, string | string[]> }, res: ServerResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' });
   }
 
   try {
@@ -29,9 +29,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        LIMIT 10`
     );
 
-    res.status(200).json({ data: nearbyOpportunities });
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: nearbyOpportunities });
   } catch (error) {
     console.error('Nearby opportunities error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Internal server error' });
   }
 }
