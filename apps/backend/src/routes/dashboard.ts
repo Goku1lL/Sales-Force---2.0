@@ -29,6 +29,9 @@ router.get('/summary', async (req, res, next) => {
       employeeId, today
     );
 
+    // Debug logging
+    console.log('Daily data for employee', employeeId, ':', JSON.stringify(dailyData, null, 2));
+    
     // Calculate performance-based percentages (achievement vs target in units)
     const todayAchievement = dailyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
     const todayTargetUnits = dailyData.reduce((a, r) => a + Number(r.target || 0), 0);
@@ -64,6 +67,9 @@ router.get('/summary', async (req, res, next) => {
       employeeId, employeeId
     );
 
+    // Debug logging
+    console.log('Weekly data for employee', employeeId, ':', JSON.stringify(weeklyData, null, 2));
+    
     // Calculate performance-based percentages (achievement vs target in units)
     const weeklyAchievement = weeklyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
     const weeklyTargetUnits = weeklyData.reduce((a, r) => a + Number(r.target || 0), 0);
