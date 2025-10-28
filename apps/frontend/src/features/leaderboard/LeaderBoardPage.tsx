@@ -12,7 +12,7 @@ function EmployeeDetailsCard({
   employeeDetails: any; 
   onClose: () => void;
   renderSlabBadge: (slab: any) => JSX.Element;
-  renderMetricSection: (metrics: any[]) => JSX.Element | null;
+  renderMetricSection: (metrics: any[], period: 'day' | 'week') => JSX.Element[] | null;
 }) {
   const [localPeriod, setLocalPeriod] = useState<'day' | 'week'>('day');
 
@@ -24,7 +24,32 @@ function EmployeeDetailsCard({
     );
   }
 
-  const currentMetrics = localPeriod === 'day' ? employeeDetails.daily.metrics : employeeDetails.weekly.metrics;
+  // Apply AB metrics logic
+  const getDisplayMetrics = () => {
+    // Function to filter metrics
+    const filterMetrics = (metrics: any[], period: 'day' | 'week') => {
+      if (period === 'day') {
+        // For day view, exclude AB metrics (they're weekly-only)
+        return metrics.filter(m => !m.metric.includes('AB'));
+      }
+      return metrics; // Week view shows all metrics
+    };
+
+    // Get AB metrics from weekly data
+    const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB')) || [];
+
+    // Combine appropriately
+    const displayMetrics = localPeriod === 'day'
+      ? [
+          ...filterMetrics(employeeDetails.daily?.metrics || [], 'day'),
+          ...abMetrics // Always include AB metrics from weekly
+        ]
+      : (employeeDetails.weekly?.metrics || []);
+
+    return displayMetrics;
+  };
+
+  const currentMetrics = getDisplayMetrics();
 
   return (
     <>
@@ -68,9 +93,26 @@ function EmployeeDetailsCard({
         </div>
       </div>
 
+      {/* Info message for AB metrics in Day view */}
+      {(() => {
+        const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB')) || [];
+        const hasABMetrics = localPeriod === 'day' && abMetrics.length > 0;
+        
+        return hasABMetrics ? (
+          <div className="px-6 py-3 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500">ℹ️</span>
+              <span className="text-sm text-blue-700">
+                AB metrics are displayed at weekly level
+              </span>
+            </div>
+          </div>
+        ) : null;
+      })()}
+
       {/* Metrics Section */}
       <div className="p-6">
-        {renderMetricSection(currentMetrics)}
+        {renderMetricSection(currentMetrics, localPeriod)}
       </div>
     </>
   );
@@ -170,7 +212,7 @@ export default function LeaderBoardPage() {
     );
   };
 
-  const renderMetricSection = (metrics: any[]) => {
+  const renderMetricSection = (metrics: any[], period: 'day' | 'week') => {
     // Group by metric name
     const grouped = metrics.reduce((acc: Record<string, any[]>, metric: any) => {
       const key = metric.metric || 'Unknown';
@@ -185,7 +227,7 @@ export default function LeaderBoardPage() {
 
     return groups.map(([metricName, slabMetrics]) => {
       // Sort slabs by priority (slab3 > slab2 > slab1)
-      const sortedSlabs = slabMetrics.sort((a, b) => {
+      const sortedSlabs = (slabMetrics as any[]).sort((a, b) => {
         const slabOrder = { 'slab3': 3, 'slab2': 2, 'slab1': 1 };
         return (slabOrder[b.slab_Segment as keyof typeof slabOrder] || 0) - (slabOrder[a.slab_Segment as keyof typeof slabOrder] || 0);
       });
@@ -211,6 +253,12 @@ export default function LeaderBoardPage() {
             <div className="flex items-center gap-2">
               <span className="text-2xl">{getMetricEmoji(metricName)}</span>
               <span className="font-bold text-lg">{metricName}</span>
+              {/* Weekly badge for AB metrics in Day view */}
+              {metricName.includes('AB') && period === 'day' && (
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                  Weekly
+                </span>
+              )}
             </div>
             <span className="text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap bg-blue-100 text-blue-700">
               {(Number(avgContribution) * 100).toFixed(0)}% contribution
@@ -222,7 +270,7 @@ export default function LeaderBoardPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {slabMetrics.map(slab => renderSlabBadge(slab))}
+            {(slabMetrics as any[]).map(slab => renderSlabBadge(slab))}
           </div>
         </div>
       );

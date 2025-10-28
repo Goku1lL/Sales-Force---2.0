@@ -50,9 +50,17 @@ export default function TargetsPage() {
 
   // Helper function to render performance view with slab badges
   const renderPerformanceView = (metrics: any[], totals: any, employeeVariablePay: number, periodType: 'day' | 'week') => {
-    // Convert monthly variable_pay to daily or weekly
-    const periodMultiplier = periodType === 'day' ? (1 / 30) : (1 / 4);
-    const periodVariablePay = employeeVariablePay * periodMultiplier;
+    // Separate AB and non-AB metrics for different period calculations
+    const abMetrics = metrics.filter(m => m.metric.includes('AB'));
+    const nonABMetrics = metrics.filter(m => !m.metric.includes('AB'));
+    
+    // Convert monthly variable_pay to daily or weekly for non-AB metrics
+    const nonABPeriodMultiplier = periodType === 'day' ? (1 / 30) : (1 / 4);
+    const nonABPeriodVariablePay = employeeVariablePay * nonABPeriodMultiplier;
+
+    // Convert monthly variable_pay to weekly for AB metrics (always weekly)
+    const abPeriodMultiplier = 1 / 4; // Always weekly for AB metrics
+    const abPeriodVariablePay = employeeVariablePay * abPeriodMultiplier;
 
     // Group metrics by name
     const metricSummaries: Record<string, {
@@ -66,7 +74,8 @@ export default function TargetsPage() {
       pendingToEarn: number;
     }> = {};
 
-    metrics.forEach(item => {
+    // Process non-AB metrics
+    nonABMetrics.forEach(item => {
       const metricName = item.metric;
       if (!metricSummaries[metricName]) {
         metricSummaries[metricName] = {
@@ -90,7 +99,7 @@ export default function TargetsPage() {
         else if (slabNum === 3) incentivePercent = 2;
       }
 
-      const potentialEarnings = periodVariablePay * incentivePercent;
+      const potentialEarnings = nonABPeriodVariablePay * incentivePercent;
       const earnings = Number(item.earnings || 0);
       const pendingToEarn = Math.max(0, potentialEarnings - earnings);
 
@@ -111,8 +120,80 @@ export default function TargetsPage() {
         metricSummaries[metricName].maxPotentialEarnings,
         potentialEarnings
       );
-      metricSummaries[metricName].totalEarnings += earnings;
-      metricSummaries[metricName].totalAchievement += Number(item.achievement || 0);
+      
+      // For earnings, only take the first occurrence (avoid duplication)
+      if (metricSummaries[metricName].totalEarnings === 0) {
+        metricSummaries[metricName].totalEarnings = earnings;
+      }
+      
+      // For achievements, only take the first occurrence (avoid duplication)
+      if (metricSummaries[metricName].totalAchievement === 0) {
+        metricSummaries[metricName].totalAchievement = Number(item.achievement || 0);
+      }
+      
+      metricSummaries[metricName].maxTarget = Math.max(
+        metricSummaries[metricName].maxTarget,
+        Number(item.target || 0)
+      );
+    });
+
+    // Process AB metrics (always weekly)
+    abMetrics.forEach(item => {
+      const metricName = item.metric;
+      if (!metricSummaries[metricName]) {
+        metricSummaries[metricName] = {
+          metric: metricName,
+          slabs: [],
+          maxPotentialEarnings: 0,
+          totalEarnings: 0,
+          totalAchievement: 0,
+          maxTarget: 0,
+          contribution: item.contribution || 0,
+          pendingToEarn: 0
+        };
+      }
+
+      // Calculate potential earnings for this slab
+      let incentivePercent = Number(item.incentive_percent || 0);
+      if (incentivePercent === 0 && item.slab_Segment) {
+        const slabNum = parseInt(item.slab_Segment.replace('slab', ''));
+        if (slabNum === 1) incentivePercent = 1;
+        else if (slabNum === 2) incentivePercent = 1.5;
+        else if (slabNum === 3) incentivePercent = 2;
+      }
+
+      const potentialEarnings = abPeriodVariablePay * incentivePercent;
+      const earnings = Number(item.earnings || 0);
+      const pendingToEarn = Math.max(0, potentialEarnings - earnings);
+
+      // Add slab to the list
+      metricSummaries[metricName].slabs.push({
+        slab_Segment: item.slab_Segment,
+        target: Number(item.target || 0),
+        achievement: Number(item.achievement || 0),
+        achievement_percentage: item.achievement_percentage || 0,
+        earnings,
+        potentialEarnings,
+        pendingToEarn,
+        incentivePercent
+      });
+
+      // Track max potential and totals
+      metricSummaries[metricName].maxPotentialEarnings = Math.max(
+        metricSummaries[metricName].maxPotentialEarnings,
+        potentialEarnings
+      );
+      
+      // For earnings, only take the first occurrence (avoid duplication)
+      if (metricSummaries[metricName].totalEarnings === 0) {
+        metricSummaries[metricName].totalEarnings = earnings;
+      }
+      
+      // For achievements, only take the first occurrence (avoid duplication)
+      if (metricSummaries[metricName].totalAchievement === 0) {
+        metricSummaries[metricName].totalAchievement = Number(item.achievement || 0);
+      }
+      
       metricSummaries[metricName].maxTarget = Math.max(
         metricSummaries[metricName].maxTarget,
         Number(item.target || 0)
@@ -210,7 +291,17 @@ export default function TargetsPage() {
                     {getMetricEmoji(summary.metric)}
                   </span>
                   <div>
-                    <div className="font-bold text-xl">{summary.metric}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xl">{summary.metric}</span>
+                      {/* Weekly badge for AB metrics in Day view */}
+                      {summary.metric.includes('AB') && viewMode === 'day' && (
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          currentTheme.isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          Weekly
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-gray-600">
                       💵 Pending: <span className="font-semibold text-orange-600">{formatCurrency(summary.pendingToEarn)}</span>
                     </div>
@@ -471,26 +562,86 @@ export default function TargetsPage() {
             </div>
           </div>
 
-          {/* Render Performance View based on viewMode */}
-          {viewMode === 'day' ? (
-            <>
-              {renderPerformanceView(
-                employeeDetails.daily?.metrics || [],
-                employeeDetails.daily?.totals || {},
-                employeeDetails.daily?.employee_variable_pay || 0,
-                'day'
-              )}
-            </>
-          ) : (
-            <>
-              {renderPerformanceView(
-                employeeDetails.weekly?.metrics || [],
-                employeeDetails.weekly?.totals || {},
-                employeeDetails.weekly?.employee_variable_pay || 0,
-                'week'
-              )}
-            </>
-          )}
+          {/* Render Performance View based on viewMode with AB metrics logic */}
+          {(() => {
+            // Function to filter metrics
+            const filterMetrics = (metrics: any[], period: 'day' | 'week') => {
+              if (period === 'day') {
+                // For day view, exclude AB metrics (they're weekly-only)
+                return metrics.filter(m => !m.metric.includes('AB'));
+              }
+              return metrics; // Week view shows all metrics
+            };
+
+            // Function to recalculate totals after filtering
+            const recalculateTotals = (metrics: any[]) => {
+              const groupedMetrics = metrics.reduce((acc, m) => {
+                if (!acc[m.metric]) {
+                  acc[m.metric] = { achievement: 0, target: 0, earnings: 0 };
+                }
+                // Only count first occurrence (avoid slab duplication)
+                if (acc[m.metric].achievement === 0) {
+                  acc[m.metric].achievement = m.achievement;
+                  acc[m.metric].earnings = m.earnings;
+                }
+                acc[m.metric].target = Math.max(acc[m.metric].target, m.target);
+                return acc;
+              }, {});
+
+              const groups = Object.values(groupedMetrics);
+              return {
+                achievement: groups.reduce((sum: number, g: any) => sum + g.achievement, 0),
+                target: groups.reduce((sum: number, g: any) => sum + g.target, 0),
+                earnings: groups.reduce((sum: number, g: any) => sum + g.earnings, 0)
+              };
+            };
+
+            // Get AB metrics from weekly data
+            const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB')) || [];
+
+            // Combine appropriately
+            const displayMetrics = viewMode === 'day'
+              ? [
+                  ...filterMetrics(employeeDetails.daily?.metrics || [], 'day'),
+                  ...abMetrics // Always include AB metrics from weekly
+                ]
+              : (employeeDetails.weekly?.metrics || []);
+
+            const displayTotals = recalculateTotals(displayMetrics);
+
+            // Show info message if Day view has AB metrics
+            const hasABMetrics = viewMode === 'day' && abMetrics.length > 0;
+
+            return (
+              <>
+                {/* Info message for AB metrics in Day view */}
+                {hasABMetrics && (
+                  <div className={`mb-4 p-3 rounded-lg border ${
+                    currentTheme.isDark 
+                      ? 'bg-blue-500/10 border-blue-500/20' 
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-500">ℹ️</span>
+                      <span className={`text-sm ${
+                        currentTheme.isDark ? 'text-blue-300' : 'text-blue-700'
+                      }`}>
+                        AB metrics are displayed at weekly level
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Performance View */}
+                {renderPerformanceView(
+                  displayMetrics,
+                  displayTotals,
+                  employeeDetails.daily?.employee_variable_pay || 0,
+                  viewMode
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

@@ -12,40 +12,75 @@ router.get('/summary', async (req, res, next) => {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // Get daily targets and achievements - achievements are raw numbers, not slab-specific
-    const dailyData = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT
-        dt.metric,
-        dt.target,
-        dt.slab_Segment,
-        dt.incentive_percent,
-        COALESCE(da.Achievement, 0) as achievement,
-        COALESCE(da.variable_pay, 0) as variable_pay
-       FROM DayTargets dt
-       LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
-         AND dt.date = da.date
-         AND dt.metric = da.metric
-         AND da.deleted = 0
-       WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0`,
+    // Get daily achievements separately (grouped by metric to avoid duplication)
+    const dailyAchievementsRaw = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, SUM(Achievement) as achievement, SUM(variable_pay) as variable_pay
+       FROM DayAchievement 
+       WHERE employee_id = ? AND date = ? AND deleted = 0
+       GROUP BY metric`,
       employeeId, today
     );
 
-    // Group by metric and calculate achievements vs targets properly
-    const metricGroups = dailyData.reduce((groups: Record<string, any>, row) => {
+    // Get employee's base variable pay
+    const employeeData = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT variable_pay FROM Executive WHERE employee_id = ? AND deleted = 0 LIMIT 1`,
+      employeeId
+    );
+
+    const monthlyVariablePay = Number(employeeData[0]?.variable_pay || 0);
+    const dailyBasePay = monthlyVariablePay / 30;
+    const weeklyBasePay = monthlyVariablePay / 4;
+
+    // Function to calculate slab multiplier based on achievement
+    function getSlabMultiplier(achievement: number, targets: any[]): number {
+      // Sort slabs by target (ascending)
+      const sortedSlabs = targets.sort((a, b) => a.target - b.target);
+      
+      // Find the highest slab reached
+      let multiplier = sortedSlabs[0]?.incentive_percent || 1;
+      
+      for (const slab of sortedSlabs) {
+        if (achievement >= slab.target) {
+          multiplier = slab.incentive_percent;
+        } else {
+          break;
+        }
+      }
+      
+      return multiplier;
+    }
+
+    // Create achievement lookup map
+    const dailyAchievementMap = dailyAchievementsRaw.reduce((map: Record<string, any>, item) => {
+      map[item.metric] = {
+        achievement: Number(item.achievement || 0),
+        variable_pay: Number(item.variable_pay || 0)
+      };
+      return map;
+    }, {});
+
+    // Get daily targets with all slabs
+    const dailyTargets = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, target, slab_Segment, incentive_percent, contribution
+       FROM DayTargets
+       WHERE employee_id = ? AND date = ? AND deleted = 0
+       ORDER BY metric, slab_Segment`,
+      employeeId, today
+    );
+
+    // Group targets by metric and calculate totals properly
+    const metricGroups = dailyTargets.reduce((groups: Record<string, any>, row) => {
       const metric = row.metric;
       if (!groups[metric]) {
         groups[metric] = {
           metric,
-          totalAchievement: 0,
+          totalAchievement: dailyAchievementMap[metric]?.achievement || 0,
           targets: [],
           totalTarget: 0,
-          totalEarnings: 0
+          totalEarnings: 0,
+          contribution: Number(row.contribution || 1)
         };
       }
-      
-      // Sum achievements (they're raw numbers, not slab-specific)
-      groups[metric].totalAchievement += Number(row.achievement || 0);
-      groups[metric].totalEarnings += Number(row.variable_pay || 0);
       
       // Store targets with their slab info
       groups[metric].targets.push({
@@ -54,11 +89,28 @@ router.get('/summary', async (req, res, next) => {
         incentive_percent: Number(row.incentive_percent || 0)
       });
       
-      // Sum total target (highest slab target)
+      // Use highest target (highest slab)
       groups[metric].totalTarget = Math.max(groups[metric].totalTarget, Number(row.target || 0));
       
       return groups;
     }, {});
+
+    // Calculate earnings for each metric group
+    Object.keys(metricGroups).forEach(metricName => {
+      const group = metricGroups[metricName];
+      const achievement = group.totalAchievement;
+      const contribution = group.contribution;
+      
+      // Determine slab multiplier
+      const slabMultiplier = getSlabMultiplier(achievement, group.targets);
+      
+      // Calculate earnings
+      const metricBasePay = dailyBasePay * contribution;
+      const achievementRatio = group.totalTarget > 0 ? achievement / group.totalTarget : 0;
+      const earned = metricBasePay * achievementRatio * slabMultiplier;
+      
+      group.totalEarnings = earned;
+    });
 
     // Calculate total achievements and targets across all metrics
     const todayAchievement = Object.values(metricGroups).reduce((sum: number, group: any) => sum + group.totalAchievement, 0);
@@ -67,56 +119,90 @@ router.get('/summary', async (req, res, next) => {
 
     // Calculate potential earnings based on earning rates per unit
     // AB: ₹10/unit, GT OC: ₹50/unit, Fruits OC: ₹100/unit
-    const todayPotentialEarnings = dailyData.reduce((total, r) => {
-      const target = Number(r.target || 0);
+    const todayPotentialEarnings = Object.values(metricGroups).reduce((total, group: any) => {
+      const target = group.totalTarget; // Use highest slab target
       let rate = 0;
-      if (r.metric === 'AB') rate = 10;
-      else if (r.metric === 'GT OC') rate = 50;
-      else if (r.metric === 'Fruits OC') rate = 100;
+      if (group.metric === 'AB') rate = 10;
+      else if (group.metric === 'GT OC') rate = 50;
+      else if (group.metric === 'Fruits OC') rate = 100;
+      else if (group.metric === 'Fruits AB') rate = 100; // Add Fruits AB rate
       return total + (target * rate);
     }, 0);
 
-    // Get weekly targets and achievements - achievements are raw numbers, not slab-specific
-    const weeklyData = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT
-        wt.metric,
-        wt.target,
-        wt.slab_Segment,
-        wt.incentive_percent,
-        COALESCE(wa.Achievement, 0) as achievement,
-        COALESCE(wa.variable_pay, 0) as variable_pay
-       FROM WeekTargets wt
-       LEFT JOIN WeekAchievement wa ON wt.employee_id = wa.employee_id
-         AND wt.yearweek = wa.yearweek
-         AND wt.metric = wa.metric
-         AND wa.deleted = 0
-       WHERE wt.employee_id = ? AND wt.yearweek = (
+    // Get weekly achievements separately (grouped by metric to avoid duplication)
+    const weeklyAchievementsRaw = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, SUM(Achievement) as achievement, SUM(variable_pay) as variable_pay
+       FROM WeekAchievement 
+       WHERE employee_id = ? AND yearweek = (
          SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
-       ) AND wt.deleted = 0`,
+       ) AND deleted = 0
+       GROUP BY metric`,
       employeeId, employeeId
     );
 
-    // Group weekly data by metric and calculate properly
-    const weeklyMetricGroups = weeklyData.reduce((groups: Record<string, any>, row) => {
+    // Get weekly targets with all slabs
+    const weeklyTargets = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, target, slab_Segment, incentive_percent, contribution
+       FROM WeekTargets
+       WHERE employee_id = ? AND yearweek = (
+         SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
+       ) AND deleted = 0
+       ORDER BY metric, slab_Segment`,
+      employeeId, employeeId
+    );
+
+    // Create weekly achievement lookup map
+    const weeklyAchievementMap = weeklyAchievementsRaw.reduce((map: Record<string, any>, item) => {
+      map[item.metric] = {
+        achievement: Number(item.achievement || 0),
+        variable_pay: Number(item.variable_pay || 0)
+      };
+      return map;
+    }, {});
+
+    // Group weekly targets by metric and calculate totals properly
+    const weeklyMetricGroups = weeklyTargets.reduce((groups: Record<string, any>, row) => {
       const metric = row.metric;
       if (!groups[metric]) {
         groups[metric] = {
           metric,
-          totalAchievement: 0,
+          totalAchievement: weeklyAchievementMap[metric]?.achievement || 0,
           totalTarget: 0,
-          totalEarnings: 0
+          totalEarnings: 0,
+          contribution: Number(row.contribution || 1),
+          targets: []
         };
       }
       
-      // Sum achievements (they're raw numbers, not slab-specific)
-      groups[metric].totalAchievement += Number(row.achievement || 0);
-      groups[metric].totalEarnings += Number(row.variable_pay || 0);
+      // Store targets with their slab info
+      groups[metric].targets.push({
+        slab: row.slab_Segment,
+        target: Number(row.target || 0),
+        incentive_percent: Number(row.incentive_percent || 0)
+      });
       
-      // Sum total target (highest slab target)
+      // Use highest target (highest slab)
       groups[metric].totalTarget = Math.max(groups[metric].totalTarget, Number(row.target || 0));
       
       return groups;
     }, {});
+
+    // Calculate earnings for each weekly metric group
+    Object.keys(weeklyMetricGroups).forEach(metricName => {
+      const group = weeklyMetricGroups[metricName];
+      const achievement = group.totalAchievement;
+      const contribution = group.contribution;
+      
+      // Determine slab multiplier
+      const slabMultiplier = getSlabMultiplier(achievement, group.targets);
+      
+      // Calculate earnings
+      const metricBasePay = weeklyBasePay * contribution;
+      const achievementRatio = group.totalTarget > 0 ? achievement / group.totalTarget : 0;
+      const earned = metricBasePay * achievementRatio * slabMultiplier;
+      
+      group.totalEarnings = earned;
+    });
 
     // Calculate total achievements and targets across all metrics
     const weeklyAchievement = Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.totalAchievement, 0);
@@ -125,12 +211,13 @@ router.get('/summary', async (req, res, next) => {
 
     // Calculate potential earnings based on earning rates per unit
     // AB: ₹10/unit, GT OC: ₹50/unit, Fruits OC: ₹100/unit
-    const weeklyPotentialEarnings = weeklyData.reduce((total, r) => {
-      const target = Number(r.target || 0);
+    const weeklyPotentialEarnings = Object.values(weeklyMetricGroups).reduce((total, group: any) => {
+      const target = group.totalTarget; // Use highest slab target
       let rate = 0;
-      if (r.metric === 'AB') rate = 10;
-      else if (r.metric === 'GT OC') rate = 50;
-      else if (r.metric === 'Fruits OC') rate = 100;
+      if (group.metric === 'AB') rate = 10;
+      else if (group.metric === 'GT OC') rate = 50;
+      else if (group.metric === 'Fruits OC') rate = 100;
+      else if (group.metric === 'Fruits AB') rate = 100; // Add Fruits AB rate
       return total + (target * rate);
     }, 0);
 

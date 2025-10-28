@@ -113,22 +113,15 @@ router.get('/cluster/:cluster', async (req, res, next) => {
                  e.employee_id,
                  e.Name,
                  e.cluster,
-                 COALESCE(SUM(da.Achievement), 0) as total_achievement,
-                 COALESCE(SUM(dt.target), 0) as total_target,
+                 COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as achievement,
+                 COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as target,
                  CASE 
-                   WHEN COALESCE(SUM(dt.target), 0) > 0 
-                   THEN (COALESCE(SUM(da.Achievement), 0) / COALESCE(SUM(dt.target), 0)) * 100
+                   WHEN COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) > 0 
+                   THEN (COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0)) * 100
                    ELSE 0
                  END as achievement_percentage
                FROM Executive e
-               LEFT JOIN DayAchievement da ON e.employee_id = da.employee_id
-                 AND da.deleted = 0
-                 AND da.date = CURDATE()
-               LEFT JOIN DayTargets dt ON e.employee_id = dt.employee_id
-                 AND dt.date = CURDATE()
-                 AND dt.deleted = 0
                WHERE e.deleted = 0 AND e.cluster = ?
-               GROUP BY e.employee_id, e.Name, e.cluster
                ORDER BY achievement_percentage DESC
                LIMIT 100
              ) t
@@ -145,22 +138,15 @@ router.get('/cluster/:cluster', async (req, res, next) => {
                  e.employee_id,
                  e.Name,
                  e.cluster,
-                 COALESCE(SUM(wa.Achievement), 0) as total_achievement,
-                 COALESCE(SUM(wt.target), 0) as total_target,
+                 COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as achievement,
+                 COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as target,
                  CASE 
-                   WHEN COALESCE(SUM(wt.target), 0) > 0 
-                   THEN (COALESCE(SUM(wa.Achievement), 0) / COALESCE(SUM(wt.target), 0)) * 100
+                   WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) > 0 
+                   THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0)) * 100
                    ELSE 0
                  END as achievement_percentage
                FROM Executive e
-               LEFT JOIN WeekAchievement wa ON e.employee_id = wa.employee_id
-                 AND wa.deleted = 0
-                 AND wa.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
-               LEFT JOIN WeekTargets wt ON e.employee_id = wt.employee_id
-                 AND wt.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
-                 AND wt.deleted = 0
                WHERE e.deleted = 0 AND e.cluster = ?
-               GROUP BY e.employee_id, e.Name, e.cluster
                ORDER BY achievement_percentage DESC
                LIMIT 100
              ) t
@@ -188,23 +174,16 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
              e.Name,
              e.CityId,
              cd.City as city_name,
-             COALESCE(SUM(da.Achievement), 0) as total_achievement,
-             COALESCE(SUM(dt.target), 0) as total_target,
+             COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as achievement,
+             COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as target,
              CASE 
-               WHEN COALESCE(SUM(dt.target), 0) > 0 
-               THEN (COALESCE(SUM(da.Achievement), 0) / COALESCE(SUM(dt.target), 0)) * 100
+               WHEN COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) > 0 
+               THEN (COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0)) * 100
                ELSE 0
              END as achievement_percentage
            FROM Executive e
            LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
-           LEFT JOIN DayAchievement da ON e.employee_id = da.employee_id
-             AND da.deleted = 0
-             AND da.date = CURDATE()
-           LEFT JOIN DayTargets dt ON e.employee_id = dt.employee_id
-             AND dt.date = CURDATE()
-             AND dt.deleted = 0
            WHERE e.deleted = 0 AND e.CityId = ?
-           GROUP BY e.employee_id, e.Name, e.CityId, cd.City
            ORDER BY achievement_percentage DESC
            LIMIT 100
          ) t
@@ -222,23 +201,16 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
              e.Name,
              e.CityId,
              cd.City as city_name,
-             COALESCE(SUM(wa.Achievement), 0) as total_achievement,
-             COALESCE(SUM(wt.target), 0) as total_target,
+             COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as achievement,
+             COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as target,
              CASE 
-               WHEN COALESCE(SUM(wt.target), 0) > 0 
-               THEN (COALESCE(SUM(wa.Achievement), 0) / COALESCE(SUM(wt.target), 0)) * 100
+               WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) > 0 
+               THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0)) * 100
                ELSE 0
              END as achievement_percentage
            FROM Executive e
            LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
-           LEFT JOIN WeekAchievement wa ON e.employee_id = wa.employee_id
-             AND wa.deleted = 0
-             AND wa.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
-           LEFT JOIN WeekTargets wt ON e.employee_id = wt.employee_id
-             AND wt.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
-             AND wt.deleted = 0
            WHERE e.deleted = 0 AND e.CityId = ?
-           GROUP BY e.employee_id, e.Name, e.CityId, cd.City
            ORDER BY achievement_percentage DESC
            LIMIT 100
          ) t
@@ -323,51 +295,109 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
     const emp = employee[0];
     const employeeVariablePay = Number(emp.variable_pay || 0);
 
+    // Get employee's base variable pay
+    const monthlyVariablePay = employeeVariablePay;
+    const dailyBasePay = monthlyVariablePay / 30;
+    const weeklyBasePay = monthlyVariablePay / 4;
+
+    // Function to calculate slab multiplier based on achievement
+    function getSlabMultiplier(achievement: number, targets: any[]): number {
+      // Sort slabs by target (ascending)
+      const sortedSlabs = targets.sort((a, b) => a.target - b.target);
+      
+      // Find the highest slab reached
+      let multiplier = sortedSlabs[0]?.incentive_percent || 1;
+      
+      for (const slab of sortedSlabs) {
+        if (achievement >= slab.target) {
+          multiplier = slab.incentive_percent;
+        } else {
+          break;
+        }
+      }
+      
+      return multiplier;
+    }
+
     // Get daily achievements for today
     const today = new Date().toISOString().slice(0, 10);
-    const dailyAchievements = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT dt.metric, dt.target, da.Achievement, da.variable_pay as achievement_earnings, dt.incentive_percent, dt.slab_Segment, dt.contribution
-       FROM DayTargets dt
-       LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
-         AND dt.date = da.date
-         AND dt.metric = da.metric
-         AND da.deleted = 0
-       WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0
-       ORDER BY dt.metric, dt.slab_Segment`,
+    
+    // Get achievements separately (grouped by metric to avoid duplication)
+    const dailyAchievementsRaw = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, SUM(Achievement) as achievement, SUM(variable_pay) as achievement_earnings
+       FROM DayAchievement 
+       WHERE employee_id = ? AND date = ? AND deleted = 0
+       GROUP BY metric`,
+      employeeId, today
+    );
+
+    // Get targets with all slabs
+    const dailyTargets = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, target, incentive_percent, slab_Segment, contribution
+       FROM DayTargets
+       WHERE employee_id = ? AND date = ? AND deleted = 0
+       ORDER BY metric, slab_Segment`,
       employeeId, today
     );
 
     // Get weekly achievements for current week
-    // Since WeekAchievement table is empty, we'll get targets for the current week
-    const currentYearWeek = Math.floor(new Date().getTime() / 1000 / 60 / 60 / 24 / 7) + 202400; // Rough calculation
-    const weeklyAchievements = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT wt.metric, wt.target, wa.Achievement, wa.variable_pay as achievement_earnings, wt.incentive_percent, wt.slab_Segment, wt.contribution
-       FROM WeekTargets wt
-       LEFT JOIN WeekAchievement wa ON wt.employee_id = wa.employee_id
-         AND wt.yearweek = wa.yearweek
-         AND wt.metric = wa.metric
-         AND wa.deleted = 0
-       WHERE wt.employee_id = ? AND wt.yearweek = (
+    const weeklyAchievementsRaw = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, SUM(Achievement) as achievement, SUM(variable_pay) as achievement_earnings
+       FROM WeekAchievement 
+       WHERE employee_id = ? AND yearweek = (
          SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
-       ) AND wt.deleted = 0
-       ORDER BY wt.metric, wt.slab_Segment`,
+       ) AND deleted = 0
+       GROUP BY metric`,
       employeeId, employeeId
     );
 
-    // Group by metric and calculate totals properly
-    const dailyMetricGroups = dailyAchievements.reduce((groups: Record<string, any>, item) => {
+    // Get weekly targets with all slabs
+    const weeklyTargets = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, target, incentive_percent, slab_Segment, contribution
+       FROM WeekTargets
+       WHERE employee_id = ? AND yearweek = (
+         SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
+       ) AND deleted = 0
+       ORDER BY metric, slab_Segment`,
+      employeeId, employeeId
+    );
+
+    // Create achievement lookup maps
+    const dailyAchievementMap = dailyAchievementsRaw.reduce((map: Record<string, any>, item) => {
+      map[item.metric] = {
+        achievement: Number(item.achievement || 0),
+        earnings: Number(item.achievement_earnings || 0)
+      };
+      return map;
+    }, {});
+
+    const weeklyAchievementMap = weeklyAchievementsRaw.reduce((map: Record<string, any>, item) => {
+      map[item.metric] = {
+        achievement: Number(item.achievement || 0),
+        earnings: Number(item.achievement_earnings || 0)
+      };
+      return map;
+    }, {});
+
+    // Group targets by metric and calculate totals
+    const dailyMetricGroups = dailyTargets.reduce((groups: Record<string, any>, item) => {
       const metric = item.metric;
       if (!groups[metric]) {
         groups[metric] = {
-          achievement: 0,
+          achievement: dailyAchievementMap[metric]?.achievement || 0,
           target: 0,
-          earnings: 0
+          earnings: 0,
+          contribution: Number(item.contribution || 1),
+          targets: []
         };
       }
       
-      // Sum achievements (they're raw numbers, not slab-specific)
-      groups[metric].achievement += Number(item.Achievement || 0);
-      groups[metric].earnings += Number(item.achievement_earnings || 0);
+      // Store targets with their slab info
+      groups[metric].targets.push({
+        slab: item.slab_Segment,
+        target: Number(item.target || 0),
+        incentive_percent: Number(item.incentive_percent || 0)
+      });
       
       // Use highest target (highest slab)
       groups[metric].target = Math.max(groups[metric].target, Number(item.target || 0));
@@ -375,25 +405,64 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       return groups;
     }, {});
 
-    const weeklyMetricGroups = weeklyAchievements.reduce((groups: Record<string, any>, item) => {
+    // Calculate earnings for each daily metric group
+    Object.keys(dailyMetricGroups).forEach(metricName => {
+      const group = dailyMetricGroups[metricName];
+      const achievement = group.achievement;
+      const contribution = group.contribution;
+      
+      // Determine slab multiplier
+      const slabMultiplier = getSlabMultiplier(achievement, group.targets);
+      
+      // Calculate earnings
+      const metricBasePay = dailyBasePay * contribution;
+      const achievementRatio = group.target > 0 ? achievement / group.target : 0;
+      const earned = metricBasePay * achievementRatio * slabMultiplier;
+      
+      group.earnings = earned;
+    });
+
+    const weeklyMetricGroups = weeklyTargets.reduce((groups: Record<string, any>, item) => {
       const metric = item.metric;
       if (!groups[metric]) {
         groups[metric] = {
-          achievement: 0,
+          achievement: weeklyAchievementMap[metric]?.achievement || 0,
           target: 0,
-          earnings: 0
+          earnings: 0,
+          contribution: Number(item.contribution || 1),
+          targets: []
         };
       }
       
-      // Sum achievements (they're raw numbers, not slab-specific)
-      groups[metric].achievement += Number(item.Achievement || 0);
-      groups[metric].earnings += Number(item.achievement_earnings || 0);
+      // Store targets with their slab info
+      groups[metric].targets.push({
+        slab: item.slab_Segment,
+        target: Number(item.target || 0),
+        incentive_percent: Number(item.incentive_percent || 0)
+      });
       
       // Use highest target (highest slab)
       groups[metric].target = Math.max(groups[metric].target, Number(item.target || 0));
       
       return groups;
     }, {});
+
+    // Calculate earnings for each weekly metric group
+    Object.keys(weeklyMetricGroups).forEach(metricName => {
+      const group = weeklyMetricGroups[metricName];
+      const achievement = group.achievement;
+      const contribution = group.contribution;
+      
+      // Determine slab multiplier
+      const slabMultiplier = getSlabMultiplier(achievement, group.targets);
+      
+      // Calculate earnings
+      const metricBasePay = weeklyBasePay * contribution;
+      const achievementRatio = group.target > 0 ? achievement / group.target : 0;
+      const earned = metricBasePay * achievementRatio * slabMultiplier;
+      
+      group.earnings = earned;
+    });
 
     // Calculate totals
     const dailyTotal = {
@@ -421,30 +490,38 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
         },
         daily: {
           date: today,
-          metrics: dailyAchievements.map(item => ({
-            metric: item.metric,
-            slab_Segment: item.slab_Segment,
-            achievement: Number(item.Achievement || 0),
-            target: Number(item.target || 0),
-            earnings: Number(item.achievement_earnings || 0),
-            contribution: Number(item.contribution || 0),
-            incentive_percent: Number(item.incentive_percent || 0),
-            achievement_percentage: item.target > 0 ? ((item.Achievement || 0) / item.target * 100) : 0
-          })),
+          metrics: dailyTargets.map(target => {
+            const achievement = dailyAchievementMap[target.metric];
+            const metricGroup = dailyMetricGroups[target.metric];
+            return {
+              metric: target.metric,
+              slab_Segment: target.slab_Segment,
+              achievement: achievement?.achievement || 0,
+              target: Number(target.target || 0),
+              earnings: metricGroup?.earnings || 0,
+              contribution: Number(target.contribution || 0),
+              incentive_percent: Number(target.incentive_percent || 0),
+              achievement_percentage: target.target > 0 ? ((achievement?.achievement || 0) / target.target * 100) : 0
+            };
+          }),
           totals: dailyTotal,
           employee_variable_pay: employeeVariablePay
         },
         weekly: {
-          metrics: weeklyAchievements.map(item => ({
-            metric: item.metric,
-            slab_Segment: item.slab_Segment,
-            achievement: Number(item.Achievement || 0),
-            target: Number(item.target || 0),
-            earnings: Number(item.achievement_earnings || 0),
-            contribution: Number(item.contribution || 0),
-            incentive_percent: Number(item.incentive_percent || 0),
-            achievement_percentage: item.target > 0 ? ((item.Achievement || 0) / item.target * 100) : 0
-          })),
+          metrics: weeklyTargets.map(target => {
+            const achievement = weeklyAchievementMap[target.metric];
+            const metricGroup = weeklyMetricGroups[target.metric];
+            return {
+              metric: target.metric,
+              slab_Segment: target.slab_Segment,
+              achievement: achievement?.achievement || 0,
+              target: Number(target.target || 0),
+              earnings: metricGroup?.earnings || 0,
+              contribution: Number(target.contribution || 0),
+              incentive_percent: Number(target.incentive_percent || 0),
+              achievement_percentage: target.target > 0 ? ((achievement?.achievement || 0) / target.target * 100) : 0
+            };
+          }),
           totals: weeklyTotal,
           employee_variable_pay: employeeVariablePay
         }
