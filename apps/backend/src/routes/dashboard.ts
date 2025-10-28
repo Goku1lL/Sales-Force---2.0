@@ -29,6 +29,12 @@ router.get('/summary', async (req, res, next) => {
       employeeId, today
     );
 
+    // Debug logging to see what data we're getting
+    console.log('=== DAILY DATA DEBUG ===');
+    console.log('Employee ID:', employeeId);
+    console.log('Date:', today);
+    console.log('Raw daily data:', JSON.stringify(dailyData, null, 2));
+
     // Calculate performance-based percentages (achievement vs target in units)
     const todayAchievement = dailyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
     const todayTargetUnits = dailyData.reduce((a, r) => a + Number(r.target || 0), 0);
