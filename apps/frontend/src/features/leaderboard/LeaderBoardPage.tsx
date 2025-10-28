@@ -184,10 +184,23 @@ export default function LeaderBoardPage() {
     if (groups.length === 0) return null;
 
     return groups.map(([metricName, slabMetrics]) => {
-      const totalTarget = slabMetrics.reduce((sum, m) => sum + Number(m.target || 0), 0);
-      const totalAchievement = slabMetrics.reduce((sum, m) => sum + Number(m.achievement || 0), 0);
+      // Sort slabs by priority (slab3 > slab2 > slab1)
+      const sortedSlabs = slabMetrics.sort((a, b) => {
+        const slabOrder = { 'slab3': 3, 'slab2': 2, 'slab1': 1 };
+        return (slabOrder[b.slab_Segment as keyof typeof slabOrder] || 0) - (slabOrder[a.slab_Segment as keyof typeof slabOrder] || 0);
+      });
+
+      // Find the highest slab that's not completed (or the highest slab if all are completed)
+      const highestSlab = sortedSlabs.find(slab => {
+        const achievement = Number(slab.achievement || 0);
+        const target = Number(slab.target || 0);
+        return achievement < target;
+      }) || sortedSlabs[0]; // If all completed, show the highest slab
+
+      const highestSlabTarget = Number(highestSlab?.target || 0);
+      const highestSlabAchievement = Number(highestSlab?.achievement || 0);
+      const remaining = Math.max(0, highestSlabTarget - highestSlabAchievement);
       const avgContribution = slabMetrics[0]?.contribution || 0;
-      const remaining = totalTarget - totalAchievement;
 
       return (
         <div
@@ -205,7 +218,7 @@ export default function LeaderBoardPage() {
           </div>
 
           <div className="text-sm text-gray-600 mb-4">
-            Units remaining: <span className="font-semibold text-orange-600">{remaining.toLocaleString()}</span>
+            Units remaining ({highestSlab?.slab_Segment?.toUpperCase()}): <span className="font-semibold text-orange-600">{remaining.toLocaleString()}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
