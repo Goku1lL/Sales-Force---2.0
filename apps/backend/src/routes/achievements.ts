@@ -6,12 +6,12 @@ const router = Router();
 
 router.get('/daily/:employeeId/:date', authMiddleware, async (req, res, next) => {
   try {
-    const employeeId = Number(req.params.employeeId);
+    const employeeId = req.params.employeeId;
     const date = String(req.params.date);
     const prisma = getPrisma();
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM DayAchievement WHERE employee_id = ? AND date = ? AND deleted = 0 ORDER BY metric`,
-      String(employeeId), date
+      employeeId, date
     );
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
@@ -19,12 +19,12 @@ router.get('/daily/:employeeId/:date', authMiddleware, async (req, res, next) =>
 
 router.get('/weekly/:employeeId/:yearweek', authMiddleware, async (req, res, next) => {
   try {
-    const employeeId = Number(req.params.employeeId);
+    const employeeId = req.params.employeeId;
     const yearweek = Number(req.params.yearweek);
     const prisma = getPrisma();
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM WeekAchievement WHERE employee_id = ? AND yearweek = ? AND deleted = 0 ORDER BY metric`,
-      String(employeeId), yearweek
+      employeeId, yearweek
     );
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
@@ -71,7 +71,7 @@ router.get('/detailed/weekly/:employeeId/:yearweek', authMiddleware, async (req,
       FROM WeekAchievement
       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
       ORDER BY metric
-    `, String(employeeId), Number(yearweek));
+      `, employeeId, Number(yearweek));
     
     res.json({ status: 'success', data: allAchievements });
   } catch (err) { next(err); }

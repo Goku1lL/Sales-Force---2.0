@@ -1,8 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../app/store';
 import { useGetSummaryQuery, useGetUrgentActionsQuery, useGetNearbyOpportunitiesQuery } from './dashboardApi';
-import { useGetUserProfileQuery, useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery } from '../leaderboard/leaderboardApi';
+import { useGetUserProfileQuery, useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery, useGetEmployeeDetailsQuery } from '../leaderboard/leaderboardApi';
+import { useGetAssignedCustomersQuery, useGetInactiveCustomersQuery, useGetHighValueCustomersQuery } from '../customers/customersApi';
+import { CUSTOMER_TAB_LABELS } from '../customers/customerConstants';
+import { CustomerCard } from '../customers/CustomerCard';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemedCard, ThemedBadge, ThemedProgress } from '../../shared';
 import { useLiveActivity } from '../../shared/useLiveActivity';
@@ -31,6 +35,22 @@ function Progress({ value, color = 'green' }: { value: number; color?: 'green' |
   );
 }
 
+// Helper function to format currency
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+// Helper function to get progress color based on percentage
+function getProgressBarColor(percentage: number): string {
+  if (percentage >= 80) return 'bg-green-500';
+  if (percentage >= 50) return 'bg-orange-500';
+  return 'bg-red-500';
+}
+
 // Enhanced Leaderboard Item Component - Premium Design
 function LeaderboardItem({ person, rank, isCurrentUser }: { person: any; rank: number; isCurrentUser: boolean }) {
   const { currentTheme } = useTheme();
@@ -56,10 +76,9 @@ function LeaderboardItem({ person, rank, isCurrentUser }: { person: any; rank: n
     return 'shadow-md shadow-indigo-500/20';
   };
 
-  const achievements = typeof person.weekly_achievements === 'number'
-    ? person.weekly_achievements
-    : parseFloat(person.weekly_achievements) || 0;
-  const orders = person.orders || 0;
+  const achievementPercentage = person.achievement_percentage !== undefined && person.achievement_percentage !== null
+    ? Number(person.achievement_percentage)
+    : 0;
 
   const textColor = currentTheme.isDark || currentTheme.isNeon ? 'text-white' : 'text-gray-900';
   const bgColor = isCurrentUser 
@@ -110,13 +129,13 @@ function LeaderboardItem({ person, rank, isCurrentUser }: { person: any; rank: n
           <div className="flex items-center space-x-2 justify-end">
             <span className="text-2xl">📊</span>
             <p className={`font-bold text-lg ${textColor} group-hover:text-opacity-90 whitespace-nowrap`}>
-              {achievements.toLocaleString()}
+              {achievementPercentage.toFixed(1)}%
             </p>
           </div>
           <div className="flex items-center space-x-2 justify-end">
             <span className="text-sm">🎯</span>
             <p className={`text-sm font-medium ${currentTheme.isDark || currentTheme.isNeon ? 'text-gray-300' : 'text-gray-600'} group-hover:text-opacity-80 whitespace-nowrap`}>
-              units achieved
+              target achieved
             </p>
           </div>
         </div>
@@ -128,7 +147,10 @@ function LeaderboardItem({ person, rank, isCurrentUser }: { person: any; rank: n
 // Main Dashboard Component - Clean Architecture
 export default function DashboardPage() {
   const { currentTheme } = useTheme();
+  const navigate = useNavigate();
   const [leaderboardType, setLeaderboardType] = useState<'cluster' | 'city'>('cluster');
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [leaderboardViewMode, setLeaderboardViewMode] = useState<'day' | 'week'>('day');
   // Redux state
   const { user } = useSelector((state: RootState) => state.auth);
   
@@ -136,15 +158,21 @@ export default function DashboardPage() {
   const employeeId = user?.employee_id;
   const { data: summary, isLoading: summaryLoading, error: summaryError } = useGetSummaryQuery(employeeId?.toString() || '', { skip: !employeeId });
   const { data: profile, isLoading: profileLoading, error: profileError } = useGetUserProfileQuery(employeeId, { skip: !employeeId });
+  const { data: employeeDetails } = useGetEmployeeDetailsQuery(employeeId || '', { skip: !employeeId });
   
-  const { data: clusterLeaderboard, isLoading: clusterLoading } = useGetClusterLeaderboardQuery('BLR-Cluster1', {
-    skip: !employeeId
-  });
-  const { data: cityLeaderboard, isLoading: cityLoading } = useGetCityLeaderboardQuery(2, {
-    skip: !employeeId
-  });
+  const { data: clusterLeaderboard, isLoading: clusterLoading } = useGetClusterLeaderboardQuery(
+    { cluster: profile?.cluster || '', period: leaderboardViewMode }, 
+    { skip: !employeeId || !profile?.cluster }
+  );
+  const { data: cityLeaderboard, isLoading: cityLoading } = useGetCityLeaderboardQuery(
+    { cityId: Number(profile?.CityId) || 0, period: leaderboardViewMode }, 
+    { skip: !employeeId || !profile?.CityId }
+  );
   const { data: urgentActions } = useGetUrgentActionsQuery(employeeId, { skip: !employeeId });
   const { data: nearbyOpportunities } = useGetNearbyOpportunitiesQuery();
+  const { data: priorityCustomers, isLoading: priorityLoading } = useGetHighValueCustomersQuery(employeeId || '', { skip: !employeeId });
+  const { data: assignedCustomers, isLoading: assignedLoading } = useGetAssignedCustomersQuery(employeeId || '', { skip: !employeeId });
+  const { data: inactiveCustomers, isLoading: inactiveLoading } = useGetInactiveCustomersQuery(employeeId || '', { skip: !employeeId });
 
   // Live activity with client-side polling
   const { activities: liveActivities, isLoading: liveActivityLoading } = useLiveActivity();
@@ -202,6 +230,217 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+  // Helper function to render performance view (metric summaries without slabs)
+  const renderPerformanceView = (metrics: any[], totals: any, employeeVariablePay: number, periodType: 'day' | 'week') => {
+    // Group metrics by name and aggregate across slabs
+    const metricSummaries: Record<string, {
+      metric: string;
+      target: number;
+      achievement: number;
+      earnings: number;
+      contribution: number;
+      maxPotentialEarnings: number;
+      pendingToEarn: number;
+    }> = {};
+    
+    // Convert monthly variable_pay to daily or weekly
+    // variable_pay is monthly, so for day = monthly / 30, for week = monthly / 4
+    const periodMultiplier = periodType === 'day' ? (1 / 30) : (1 / 4);
+    const periodVariablePay = employeeVariablePay * periodMultiplier;
+
+    metrics.forEach(item => {
+      const metricName = item.metric;
+      if (!metricSummaries[metricName]) {
+        metricSummaries[metricName] = {
+          metric: metricName,
+          target: 0,
+          achievement: 0,
+          earnings: 0,
+          contribution: item.contribution || 0,
+          maxPotentialEarnings: 0,
+          pendingToEarn: 0
+        };
+      }
+      
+      // For targets, take the maximum slab target
+      metricSummaries[metricName].target = Math.max(
+        metricSummaries[metricName].target,
+        Number(item.target || 0)
+      );
+      
+      // For achievements and earnings, sum across slabs
+      metricSummaries[metricName].achievement += Number(item.achievement || 0);
+      metricSummaries[metricName].earnings += Number(item.earnings || 0);
+      
+      // Calculate potential earnings using incentive_percent from database
+      // incentive_percent is stored as 1, 1.5, 2 (for 100%, 150%, 200%)
+      // If incentive_percent is 0 in database (data not populated), use slab number as fallback
+      let incentivePercent = Number(item.incentive_percent || 0);
+      
+      // Fallback: derive incentive from slab number if database value is missing
+      if (incentivePercent === 0 && item.slab_Segment) {
+        const slabNum = parseInt(item.slab_Segment.replace('slab', ''));
+        if (slabNum === 1) incentivePercent = 1;
+        else if (slabNum === 2) incentivePercent = 1.5;
+        else if (slabNum === 3) incentivePercent = 2;
+      }
+      
+      const potentialEarnings = periodVariablePay * incentivePercent;
+      
+      // Track the maximum potential earnings across all slabs
+      metricSummaries[metricName].maxPotentialEarnings = Math.max(
+        metricSummaries[metricName].maxPotentialEarnings,
+        potentialEarnings
+      );
+    });
+
+    // Calculate pending to earn for each metric
+    Object.keys(metricSummaries).forEach(metricName => {
+      const summary = metricSummaries[metricName];
+      // Pending = Max possible - Already earned
+      summary.pendingToEarn = Math.max(0, summary.maxPotentialEarnings - summary.earnings);
+    });
+
+    const summaryList = Object.values(metricSummaries);
+    
+    // Calculate totals
+    const totalTarget = summaryList.reduce((sum, m) => sum + m.target, 0);
+    const totalAchievement = summaryList.reduce((sum, m) => sum + m.achievement, 0);
+    const totalEarnings = summaryList.reduce((sum, m) => sum + m.earnings, 0);
+    const totalPending = summaryList.reduce((sum, m) => sum + m.pendingToEarn, 0);
+    const overallProgress = totalTarget > 0 ? (totalAchievement / totalTarget) * 100 : 0;
+
+    return (
+      <>
+        {/* Total Pending to Earn - Hero Section */}
+        <div className="mb-3 sm:mb-6">
+          <div className="text-center mb-2">
+            <div className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              💵 TOTAL PENDING TO EARN
+            </div>
+            <div className={`text-2xl sm:text-3xl md:text-4xl font-bold ${
+              currentTheme.isDark ? 'text-green-400' : 'text-green-600'
+            }`}>
+              {formatCurrency(totalPending)}
+            </div>
+          </div>
+          
+          {/* Overall Progress Bar */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-gray-200 rounded-full h-3">
+              <div
+                className={`h-3 rounded-full ${getProgressBarColor(overallProgress)}`}
+                style={{ width: `${Math.min(overallProgress, 100)}%` }}
+              ></div>
+            </div>
+            <span className="text-sm font-medium w-16">{overallProgress.toFixed(1)}%</span>
+          </div>
+          
+          {/* Quick Stats */}
+          <div className="flex justify-center gap-6 mt-3 text-sm">
+            <div>
+              <span className="text-gray-500">Max Potential:</span>
+              <span className="ml-1 font-semibold">{formatCurrency(summaryList.reduce((sum, m) => sum + m.maxPotentialEarnings, 0))}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Earned:</span>
+              <span className="ml-1 font-semibold text-green-600">{formatCurrency(totalEarnings)}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Pending:</span>
+              <span className="ml-1 font-semibold text-orange-600">{formatCurrency(totalPending)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Metrics Summary Separator */}
+        <div className="flex items-center justify-center my-3 sm:my-6">
+          <div className="flex-1 border-t border-gray-300"></div>
+          <h4 className="text-xs sm:text-sm font-semibold text-gray-600 uppercase tracking-wider px-2 sm:px-4">
+            METRICS SUMMARY
+          </h4>
+          <div className="flex-1 border-t border-gray-300"></div>
+        </div>
+
+        {/* Metric-Level Summary Cards */}
+        <div className="space-y-2 sm:space-y-4">
+          {summaryList.map((summary) => {
+            const achievementPercentage = summary.target > 0 
+              ? (summary.achievement / summary.target) * 100 
+              : 0;
+            
+            return (
+              <div
+                key={summary.metric}
+                className={`p-2 sm:p-4 rounded-lg border ${
+                  currentTheme.isDark 
+                    ? 'bg-gray-800/50 border-gray-700' 
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                {/* Metric Header */}
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">
+                      {summary.metric === 'FruitsAB' ? '🍎' : 
+                       summary.metric === 'GT OC' ? '📦' : 
+                       summary.metric === 'VegetablesAB' ? '🥬' : '📊'}
+                    </span>
+                    <span className="font-bold text-lg">{summary.metric}</span>
+                  </div>
+                  <span className={`text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap ${
+                    currentTheme.isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {summary.contribution * 100}% contribution
+                  </span>
+                </div>
+
+                {/* Metric Stats */}
+                <div className="grid grid-cols-2 gap-3 mb-2 text-sm">
+                  <div>
+                    <span className="text-gray-500">Target:</span>
+                    <span className="ml-1 font-semibold">{summary.target.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Achieved:</span>
+                    <span className="ml-1 font-semibold">{summary.achievement.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${getProgressBarColor(achievementPercentage)}`}
+                      style={{ width: `${Math.min(achievementPercentage, 100)}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-sm font-medium w-14">{achievementPercentage.toFixed(1)}%</span>
+                </div>
+
+                {/* Earnings */}
+                <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
+                  <div>
+                    <span className="text-gray-500">Earned:</span>
+                    <span className="ml-1 font-semibold text-green-600">
+                      {formatCurrency(summary.earnings)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">💰 Pending:</span>
+                    <span className="ml-1 font-semibold text-orange-600">
+                      {formatCurrency(summary.pendingToEarn)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className={`min-h-screen ${
@@ -332,115 +571,192 @@ export default function DashboardPage() {
           {/* Left Column - Target Cards */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Daily Target Card */}
-            <ThemedCard accent="amber">
-              <div className="flex items-start gap-4 mb-3" style={{ minHeight: '80px' }}>
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                    currentTheme.isDark
-                      ? 'bg-white/5 ring-1 ring-white/10'
-                      : 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-amber-300/30'
-                  }`}>
-                    <span className="text-3xl">💰</span>
-                  </div>
-                  <div className="min-w-0 flex-1 pr-4">
-                    <h3 className={`text-xl font-bold whitespace-nowrap ${
-                      currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
-                    }`}>
-                        Day Pending
+            {/* Performance Overview Card - Unified Day/Week View */}
+            {employeeDetails && (
+              <ThemedCard accent="purple">
+                <div className="mb-2 sm:mb-4">
+                  {/* Card Header with Toggle */}
+                  <div className="flex items-center justify-between mb-2 sm:mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        currentTheme.isDark ? 'bg-purple-500/20' : 'bg-purple-500'
+                      }`}>
+                        <span className="text-xl">💰</span>
+                      </div>
+                      <h3 className={`text-xl font-bold ${
+                        currentTheme.isDark ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        Performance Overview
                       </h3>
-                    <p className={`text-sm font-bold ${
-                      currentTheme.isDark ? 'text-yellow-200/90' : 'text-amber-900'
-                    }`}>
-                      Pending to earn
-                    </p>
+                    </div>
+                    
+                    {/* Day/Week Toggle */}
+                    <div className="flex gap-1 sm:gap-2">
+                      <button
+                        onClick={() => setViewMode('day')}
+                        className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-semibold transition-all ${
+                          viewMode === 'day'
+                            ? 'bg-purple-500 text-white shadow-lg'
+                            : currentTheme.isDark
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        DAY
+                      </button>
+                      <button
+                        onClick={() => setViewMode('week')}
+                        className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-semibold transition-all ${
+                          viewMode === 'week'
+                            ? 'bg-purple-500 text-white shadow-lg'
+                            : currentTheme.isDark
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        WEEK
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col items-end space-y-2 flex-shrink-0">
-                  <ThemedBadge className="text-xs px-3 py-1.5 whitespace-nowrap">CLUSTER RANK {clusterRank}</ThemedBadge>
-                </div>
-              </div>
-              <div>
-                <p className={`text-5xl font-extrabold mb-1 ${
-                  currentTheme.isDark ? 'text-cyan-300' : 'text-gray-900'
-                }`}>
-                  ₹{dailyPending.toFixed(0)}
-                  </p>
-                  <p className={`text-sm font-medium mb-3 ${
-                    currentTheme.isDark ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    Target: ₹{summary?.data?.todayTarget?.toFixed(0) || '0'} • Earned: ₹{summary?.data?.todayEarnings?.toFixed(0) || '0'}
-                  </p>
-                  <div className="flex justify-between text-sm mb-3">
-                  <span className={`font-bold ${
-                    currentTheme.isDark ? 'text-yellow-200' : 'text-amber-900'
-                  }`}>
-                    Progress
-                  </span>
-                  <span className={`font-bold ${
-                    currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
-                  }`}>
-                      {Math.round(dailyProgress)}% complete
-                    </span>
-                </div>
-                <ThemedProgress value={dailyProgressCapped} theme="amber" />
-              </div>
-            </ThemedCard>
 
-            {/* Weekly Target Card */}
-            <ThemedCard accent="purple">
-              <div className="flex items-start gap-4 mb-3" style={{ minHeight: '80px' }}>
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                    currentTheme.isDark
-                      ? 'bg-white/5 ring-1 ring-white/10'
-                      : 'bg-gradient-to-br from-pink-500 to-red-500 shadow-lg shadow-pink-300/30'
-                  }`}>
-                    <span className="text-3xl">📅</span>
+                  {/* Cluster and City Ranks */}
+                  <div className="flex items-center mb-2 sm:mb-4">
+                    <div className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg flex-shrink-0 ${
+                      currentTheme.isDark ? 'bg-yellow-500/20' : 'bg-yellow-100'
+                    }`}>
+                      <span className="text-xs sm:text-sm font-medium">🏆 CLUSTER RANK</span>
+                      <span className={`ml-1 sm:ml-2 text-base sm:text-lg font-bold ${
+                        currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                      }`}>
+                        {clusterRank}
+                      </span>
+                    </div>
+                    <div className="flex-1"></div>
+                    <div className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg flex-shrink-0 ${
+                      currentTheme.isDark ? 'bg-blue-500/20' : 'bg-blue-100'
+                    }`}>
+                      <span className="text-xs sm:text-sm font-medium">🌆 CITY RANK</span>
+                      <span className={`ml-1 sm:ml-2 text-base sm:text-lg font-bold ${
+                        currentTheme.isDark ? 'text-blue-400' : 'text-blue-700'
+                      }`}>
+                        {cityRank}
+                      </span>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1 pr-4">
-                    <h3 className={`text-xl font-bold whitespace-nowrap ${
-                      currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
-                    }`}>
-                        Week Pending
-                      </h3>
-                    <p className={`text-sm font-bold ${
-                      currentTheme.isDark ? 'text-purple-200/90' : 'text-green-800'
-                    }`}>
-                      Keep your streak alive
-                    </p>
+
+                  {/* Render based on view mode */}
+                  {viewMode === 'day' ? (
+                    <>
+                      {/* Daily Performance */}
+                      {renderPerformanceView(
+                        employeeDetails.daily?.metrics || [],
+                        employeeDetails.daily?.totals || {},
+                        employeeDetails.daily?.employee_variable_pay || 0,
+                        'day'
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Weekly Performance */}
+                      {renderPerformanceView(
+                        employeeDetails.weekly?.metrics || [],
+                        employeeDetails.weekly?.totals || {},
+                        employeeDetails.weekly?.employee_variable_pay || 0,
+                        'week'
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Call to Action */}
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={() => navigate('/targets')}
+                      className={`text-sm font-semibold underline ${
+                        currentTheme.isDark ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-700'
+                      }`}
+                    >
+                      👉 View Detailed Slab Breakdown
+                    </button>
                   </div>
                 </div>
-                <div className="flex flex-col items-end space-y-2 flex-shrink-0">
-                  <ThemedBadge className="text-xs px-3 py-1.5 whitespace-nowrap">CITY RANK {cityRank}</ThemedBadge>
+              </ThemedCard>
+            )}
+
+            {/* Customer Cards - Desktop grid layout - Show available cards first */}
+            {(assignedCustomers?.length > 0 || inactiveCustomers?.length > 0 || priorityCustomers?.length > 0) && (
+              <div className="mt-6 hidden lg:block">
+                <div className="space-y-6">
+                  {/* Collect all available customer cards */}
+                  {(() => {
+                    const availableCards = [];
+                    
+                    if (assignedCustomers && assignedCustomers.length > 0) {
+                      availableCards.push(
+                        <div key="assigned">
+                          <CustomerCard
+                            customers={assignedCustomers.slice(0, 3)}
+                            title={`${CUSTOMER_TAB_LABELS.assigned} (${assignedCustomers.length})`}
+                            isLoading={assignedLoading}
+                            showDescription={false}
+                            showLastOrder={true}
+                            tabType="assigned"
+                          />
+                        </div>
+                      );
+                    }
+                    
+                    if (inactiveCustomers && inactiveCustomers.length > 0) {
+                      availableCards.push(
+                        <div key="inactive">
+                          <CustomerCard
+                            customers={inactiveCustomers.slice(0, 3)}
+                            title={`${CUSTOMER_TAB_LABELS.inactive} (${inactiveCustomers.length})`}
+                            isLoading={inactiveLoading}
+                            showDescription={false}
+                            showLastOrder={true}
+                            tabType="inactive"
+                          />
+                        </div>
+                      );
+                    }
+                    
+                    if (priorityCustomers && priorityCustomers.length > 0) {
+                      availableCards.push(
+                        <div key="high">
+                          <CustomerCard
+                            customers={priorityCustomers.slice(0, 3)}
+                            title={`${CUSTOMER_TAB_LABELS.high} (${priorityCustomers.length})`}
+                            isLoading={priorityLoading}
+                            showDescription={false}
+                            showLastOrder={true}
+                            tabType="high"
+                          />
+                        </div>
+                      );
+                    }
+
+                    // Render in a dynamic grid based on number of available cards
+                    if (availableCards.length === 1) {
+                      return <div className="grid grid-cols-1 gap-6">{availableCards}</div>;
+                    } else if (availableCards.length === 2) {
+                      return <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{availableCards}</div>;
+                    } else {
+                      // Three cards: 2 in first row, 1 in second
+                      return (
+                        <>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {availableCards.slice(0, 2)}
+                          </div>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {availableCards.slice(2)}
+                          </div>
+                        </>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
-              <div>
-                <p className={`text-5xl font-extrabold mb-1 ${
-                  currentTheme.isDark ? 'text-cyan-300' : 'text-gray-900'
-                }`}>
-                    ₹{weeklyPending.toFixed(0)}
-                  </p>
-                  <p className={`text-sm font-medium mb-3 ${
-                    currentTheme.isDark ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    Target: ₹{summary?.data?.weeklyTarget?.toFixed(0) || '0'} • Earned: ₹{summary?.data?.weeklyEarnings?.toFixed(0) || '0'}
-                  </p>
-                  <div className="flex justify-between text-sm mb-3">
-                  <span className={`font-bold ${
-                    currentTheme.isDark ? 'text-purple-200' : 'text-rose-800'
-                  }`}>
-                    Progress
-                  </span>
-                  <span className={`font-bold ${
-                    currentTheme.isDark ? 'text-[var(--text)]' : 'text-gray-900'
-                  }`}>
-                    {Math.round(weeklyProgress)}% complete
-                    </span>
-                </div>
-                <ThemedProgress value={weeklyProgressCapped} theme="rose" />
-              </div>
-            </ThemedCard>
+            )}
 
             </div>
 
@@ -462,7 +778,8 @@ export default function DashboardPage() {
                 }} />
               </div>
               
-              <div className="relative flex items-center justify-between mb-6">
+              {/* Header with Day/Week Toggle */}
+              <div className="relative flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                     currentTheme.isDark 
@@ -483,19 +800,10 @@ export default function DashboardPage() {
                     }`}>
                       Leaderboard
                     </h2>
-                    <p className={`text-sm ${
-                      currentTheme.isDark 
-                        ? 'text-gray-300' 
-                        : currentTheme.isNeon 
-                        ? 'text-gray-300'
-                        : 'text-gray-600'
-                    }`}>
-                      Top performers this week
-                    </p>
                   </div>
                 </div>
                 
-                {/* Enhanced Toggle */}
+                {/* Day/Week Toggle */}
                 <div className={`flex rounded-xl p-1 shadow-lg ${
                   currentTheme.isDark 
                     ? 'bg-gray-700/50 backdrop-blur-sm' 
@@ -503,9 +811,63 @@ export default function DashboardPage() {
                     ? 'bg-gray-700/30 backdrop-blur-sm'
                     : 'bg-gray-100 shadow-gray-200/50'
                   }`}>
-                    <button
-                    onClick={() => setLeaderboardType('cluster')}
+                  <button
+                    onClick={() => setLeaderboardViewMode('day')}
                     className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
+                      leaderboardViewMode === 'day'
+                        ? currentTheme.isDark || currentTheme.isNeon
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/30'
+                          : 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/30'
+                        : currentTheme.isDark || currentTheme.isNeon
+                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    }`}
+                  >
+                    Day
+                  </button>
+                  <button
+                    onClick={() => setLeaderboardViewMode('week')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
+                      leaderboardViewMode === 'week'
+                        ? currentTheme.isDark || currentTheme.isNeon
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/30'
+                          : 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/30'
+                        : currentTheme.isDark || currentTheme.isNeon
+                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    }`}
+                  >
+                    Week
+                  </button>
+                </div>
+              </div>
+
+              {/* Subtitle */}
+              <div className="mb-4">
+                <p className={`text-sm ${
+                  currentTheme.isDark 
+                    ? 'text-gray-300' 
+                    : currentTheme.isNeon 
+                    ? 'text-gray-300'
+                    : 'text-gray-600'
+                }`}>
+                  Top performers this {leaderboardViewMode === 'day' ? 'day' : 'week'}
+                </p>
+              </div>
+
+              {/* Cluster/City Toggle - below Leaderboard title */}
+              <div className="mb-6 relative z-10">
+                <div className={`flex rounded-xl p-1 shadow-lg relative z-10 ${
+                  currentTheme.isDark 
+                    ? 'bg-gray-700/50 backdrop-blur-sm' 
+                    : currentTheme.isNeon 
+                    ? 'bg-gray-700/30 backdrop-blur-sm'
+                    : 'bg-gray-100 shadow-gray-200/50'
+                  }`}>
+                  <button
+                    type="button"
+                    onClick={() => setLeaderboardType('cluster')}
+                    className={`relative z-10 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 min-h-[44px] w-full touch-manipulation ${
                       leaderboardType === 'cluster'
                         ? currentTheme.isDark || currentTheme.isNeon
                           ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
@@ -515,11 +877,12 @@ export default function DashboardPage() {
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                     }`}
                   >
-                      Cluster
-                    </button>
-                    <button
+                    Cluster
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setLeaderboardType('city')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
+                    className={`relative z-10 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 min-h-[44px] w-full touch-manipulation ${
                       leaderboardType === 'city'
                         ? currentTheme.isDark || currentTheme.isNeon
                           ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
@@ -529,8 +892,8 @@ export default function DashboardPage() {
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                     }`}
                   >
-                      City
-                    </button>
+                    City
+                  </button>
                 </div>
               </div>
               
@@ -682,6 +1045,48 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {/* Customer Cards - Mobile view (below leaderboard) */}
+            {/* Target Customers Card */}
+            {assignedCustomers && assignedCustomers.length > 0 && (
+              <div className="mt-6 lg:hidden">
+                <CustomerCard
+                  customers={assignedCustomers.slice(0, 5)}
+                  title={`${CUSTOMER_TAB_LABELS.assigned} (${assignedCustomers.length})`}
+                  isLoading={assignedLoading}
+                  showDescription={false}
+                  showLastOrder={true}
+                  tabType="assigned"
+                />
+              </div>
+            )}
+
+            {/* App Funnel Card */}
+            {inactiveCustomers && inactiveCustomers.length > 0 && (
+              <div className="mt-6 lg:hidden">
+                <CustomerCard
+                  customers={inactiveCustomers.slice(0, 5)}
+                  title={`${CUSTOMER_TAB_LABELS.inactive} (${inactiveCustomers.length})`}
+                  isLoading={inactiveLoading}
+                  showDescription={false}
+                  showLastOrder={true}
+                  tabType="inactive"
+                />
+              </div>
+            )}
+
+            {/* Priority Customers Card */}
+            {priorityCustomers && priorityCustomers.length > 0 && (
+              <div className="mt-6 lg:hidden">
+                <CustomerCard
+                  customers={priorityCustomers.slice(0, 5)}
+                  title={`${CUSTOMER_TAB_LABELS.high} (${priorityCustomers.length})`}
+                  isLoading={priorityLoading}
+                  showDescription={false}
+                  showLastOrder={true}
+                  tabType="high"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

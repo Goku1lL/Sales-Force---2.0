@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
 import { useGetEmployeeDetailsQuery } from '../leaderboard/leaderboardApi';
+import { useTheme } from '../../shared/ThemeContext';
 
 export default function TargetsPage() {
+  const { currentTheme } = useTheme();
   const { user, token } = useSelector((s: RootState) => s.auth);
   const employeeId = user?.employee_id;
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
 
   // Don't render anything if user is not authenticated
   if (!token || !employeeId) {
@@ -31,29 +34,289 @@ export default function TargetsPage() {
     return 'bg-red-500';
   };
 
-  const renderMetricRow = (metric: any, type: 'daily' | 'weekly') => (
-    <tr key={`${type}-${metric.metric}`} className="border-b border-gray-200">
-      <td className="px-4 py-2 font-medium">{metric.metric}</td>
-      <td className="px-4 py-2 text-center">{metric.target.toLocaleString()}</td>
-      <td className="px-4 py-2 text-center font-semibold">{metric.achievement.toLocaleString()}</td>
-      <td className="px-4 py-2">
-        <div className="flex items-center space-x-2">
+  const getSlabEmoji = (slabSegment: string) => {
+    if (slabSegment.includes('1')) return '🥉';
+    if (slabSegment.includes('2')) return '🥈';
+    if (slabSegment.includes('3')) return '🥇';
+    return '📊';
+  };
+
+  const getMetricEmoji = (metric: string) => {
+    if (metric.toLowerCase().includes('fruit')) return '🍎';
+    if (metric.toLowerCase().includes('vegetable')) return '🥬';
+    if (metric.toLowerCase().includes('gt') || metric.toLowerCase().includes('oc')) return '📦';
+    return '📊';
+  };
+
+  // Helper function to render performance view with slab badges
+  const renderPerformanceView = (metrics: any[], totals: any, employeeVariablePay: number, periodType: 'day' | 'week') => {
+    // Convert monthly variable_pay to daily or weekly
+    const periodMultiplier = periodType === 'day' ? (1 / 30) : (1 / 4);
+    const periodVariablePay = employeeVariablePay * periodMultiplier;
+
+    // Group metrics by name
+    const metricSummaries: Record<string, {
+      metric: string;
+      slabs: any[];
+      maxPotentialEarnings: number;
+      totalEarnings: number;
+      totalAchievement: number;
+      maxTarget: number;
+      contribution: number;
+      pendingToEarn: number;
+    }> = {};
+
+    metrics.forEach(item => {
+      const metricName = item.metric;
+      if (!metricSummaries[metricName]) {
+        metricSummaries[metricName] = {
+          metric: metricName,
+          slabs: [],
+          maxPotentialEarnings: 0,
+          totalEarnings: 0,
+          totalAchievement: 0,
+          maxTarget: 0,
+          contribution: item.contribution || 0,
+          pendingToEarn: 0
+        };
+      }
+
+      // Calculate potential earnings for this slab
+      let incentivePercent = Number(item.incentive_percent || 0);
+      if (incentivePercent === 0 && item.slab_Segment) {
+        const slabNum = parseInt(item.slab_Segment.replace('slab', ''));
+        if (slabNum === 1) incentivePercent = 1;
+        else if (slabNum === 2) incentivePercent = 1.5;
+        else if (slabNum === 3) incentivePercent = 2;
+      }
+
+      const potentialEarnings = periodVariablePay * incentivePercent;
+      const earnings = Number(item.earnings || 0);
+      const pendingToEarn = Math.max(0, potentialEarnings - earnings);
+
+      // Add slab to the list
+      metricSummaries[metricName].slabs.push({
+        slab_Segment: item.slab_Segment,
+        target: Number(item.target || 0),
+        achievement: Number(item.achievement || 0),
+        achievement_percentage: item.achievement_percentage || 0,
+        earnings,
+        potentialEarnings,
+        pendingToEarn,
+        incentivePercent
+      });
+
+      // Track max potential and totals
+      metricSummaries[metricName].maxPotentialEarnings = Math.max(
+        metricSummaries[metricName].maxPotentialEarnings,
+        potentialEarnings
+      );
+      metricSummaries[metricName].totalEarnings += earnings;
+      metricSummaries[metricName].totalAchievement += Number(item.achievement || 0);
+      metricSummaries[metricName].maxTarget = Math.max(
+        metricSummaries[metricName].maxTarget,
+        Number(item.target || 0)
+      );
+    });
+
+    // Calculate pending to earn for each metric
+    Object.keys(metricSummaries).forEach(metricName => {
+      const summary = metricSummaries[metricName];
+      summary.pendingToEarn = Math.max(0, summary.maxPotentialEarnings - summary.totalEarnings);
+    });
+
+    const summaryList = Object.values(metricSummaries);
+
+    // Calculate overall totals
+    const totalPending = summaryList.reduce((sum, m) => sum + m.pendingToEarn, 0);
+    const totalMaxPotential = summaryList.reduce((sum, m) => sum + m.maxPotentialEarnings, 0);
+    const totalEarnings = summaryList.reduce((sum, m) => sum + m.totalEarnings, 0);
+    const totalAchievement = summaryList.reduce((sum, m) => sum + m.totalAchievement, 0);
+    const totalMaxTarget = summaryList.reduce((sum, m) => sum + m.maxTarget, 0);
+    const overallProgress = totalMaxTarget > 0 ? (totalAchievement / totalMaxTarget) * 100 : 0;
+
+    // Find priority metric (highest pending)
+    const priorityMetric = summaryList.reduce((max, m) => m.pendingToEarn > max.pendingToEarn ? m : max, summaryList[0]);
+
+    return (
+      <>
+        {/* Hero Section: Total Pending to Earn */}
+        <div className="mb-3 sm:mb-6">
+          <div className="text-center mb-2">
+            <div className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              💵 TOTAL PENDING TO EARN
+            </div>
+            <div className={`text-2xl sm:text-3xl md:text-4xl font-bold ${
+              currentTheme.isDark ? 'text-green-400' : 'text-green-600'
+            }`}>
+              {formatCurrency(totalPending)}
+            </div>
+          </div>
+
+          {/* Overall Progress Bar */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-gray-200 rounded-full h-3">
+              <div
+                className={`h-3 rounded-full ${getProgressBarColor(overallProgress)}`}
+                style={{ width: `${Math.min(overallProgress, 100)}%` }}
+              ></div>
+            </div>
+            <span className="text-sm font-medium w-16">{overallProgress.toFixed(1)}%</span>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="flex justify-center gap-6 mt-3 text-sm">
+            <div>
+              <span className="text-gray-500">Max Potential:</span>
+              <span className="ml-1 font-semibold">{formatCurrency(totalMaxPotential)}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Earned:</span>
+              <span className="ml-1 font-semibold text-green-600">{formatCurrency(totalEarnings)}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Pending:</span>
+              <span className="ml-1 font-semibold text-orange-600">{formatCurrency(totalPending)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Metrics Summary Separator */}
+        <div className="flex items-center justify-center my-6">
+          <div className="flex-1 border-t border-gray-300"></div>
+          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider px-4">
+            METRICS SUMMARY
+          </h4>
+          <div className="flex-1 border-t border-gray-300"></div>
+        </div>
+
+        {/* Metric Sections with Slab Badges */}
+        <div className="space-y-6">
+          {summaryList.map((summary) => (
+            <div key={summary.metric} className="space-y-4">
+              {/* Metric Separator */}
+              <div className="flex items-center justify-center">
+                <div className="flex-1 border-t-2 border-gray-400"></div>
+                <h4 className="text-base font-bold text-gray-800 uppercase tracking-wide px-4">
+                  {summary.metric}
+                </h4>
+                <div className="flex-1 border-t-2 border-gray-400"></div>
+              </div>
+
+              {/* Metric Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">
+                    {getMetricEmoji(summary.metric)}
+                  </span>
+                  <div>
+                    <div className="font-bold text-xl">{summary.metric}</div>
+                    <div className="text-sm text-gray-600">
+                      💵 Pending: <span className="font-semibold text-orange-600">{formatCurrency(summary.pendingToEarn)}</span>
+                    </div>
+                  </div>
+                </div>
+                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap ${
+                  currentTheme.isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {(summary.contribution * 100).toFixed(0)}% contribution
+                </span>
+              </div>
+
+              {/* Slab Badges Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {summary.slabs.map((slab, index) => {
+                  const isActive = slab.achievement > 0 || index === 0;
+                  const status = isActive ? 'ACTIVE ⚡' : 'LOCKED';
+
+                  return (
+                    <div
+                      key={`${summary.metric}-${slab.slab_Segment}`}
+                      className={`p-4 rounded-lg border-2 ${
+                        isActive
+                          ? currentTheme.isDark
+                            ? 'border-blue-500 bg-blue-500/10'
+                            : 'border-blue-400 bg-blue-50'
+                          : currentTheme.isDark
+                          ? 'border-gray-600 bg-gray-800/50'
+                          : 'border-gray-300 bg-gray-100'
+                      }`}
+                    >
+                      {/* Slab Header */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{getSlabEmoji(slab.slab_Segment)}</span>
+                          <span className="font-bold text-sm uppercase">{slab.slab_Segment || 'Slab'}</span>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${
+                          isActive
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-400 text-gray-700'
+                        }`}>
+                          {status}
+                        </span>
+                      </div>
+
+                      {/* Target Progress */}
+                      <div className="text-center mb-2">
+                        <div className="text-lg font-bold">
+                          {slab.achievement.toLocaleString()} / {slab.target.toLocaleString()}
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="flex items-center gap-2 mb-2">
           <div className="flex-1 bg-gray-200 rounded-full h-2">
             <div
-              className={`h-2 rounded-full ${getProgressBarColor(metric.achievement_percentage)}`}
-              style={{ width: `${Math.min(metric.achievement_percentage, 100)}%` }}
+                            className={`h-2 rounded-full ${getProgressBarColor(slab.achievement_percentage)}`}
+                            style={{ width: `${Math.min(slab.achievement_percentage, 100)}%` }}
             ></div>
           </div>
-          <span className="text-sm font-medium w-12">{metric.achievement_percentage.toFixed(1)}%</span>
+                        <span className="text-xs font-medium w-12">{slab.achievement_percentage.toFixed(1)}%</span>
+                      </div>
+
+                      {/* Earnings Section */}
+                      <div className="border-t border-gray-300 pt-2 mt-2 space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Earned:</span>
+                          <span className="font-semibold text-green-600">{formatCurrency(slab.earnings)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Pending:</span>
+                          <span className="font-semibold text-orange-600">{formatCurrency(slab.pendingToEarn)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mt-1 pt-1 border-t border-gray-200">
+                          <span>{(slab.incentivePercent * 100).toFixed(0)}% incentive</span>
+                          <span>Max: {formatCurrency(slab.potentialEarnings)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-      </td>
-      <td className="px-4 py-2 text-center font-semibold text-green-600">
-        {metric.earnings !== undefined && metric.earnings !== null
-          ? formatCurrency(metric.earnings)
-          : '₹0'}
-      </td>
-    </tr>
-  );
+
+        {/* Priority Hint */}
+        {priorityMetric && (
+          <div className={`mt-6 p-4 rounded-lg ${
+            currentTheme.isDark ? 'bg-purple-500/20' : 'bg-purple-50'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎯</span>
+              <div>
+                <div className="font-semibold">PRIORITY: Focus on {priorityMetric.metric}</div>
+                <div className="text-sm text-gray-600">
+                  Highest pending earnings: {formatCurrency(priorityMetric.pendingToEarn)}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   if (!employeeId) {
     return (
@@ -61,12 +324,6 @@ export default function TargetsPage() {
         <div className="text-center">
           <p className="text-lg text-gray-600 mb-2">No employee information available</p>
           <p className="text-sm text-gray-500">Please ensure you are logged in with valid credentials</p>
-          <div className="mt-4 p-4 bg-gray-100 rounded text-left text-xs">
-            <p><strong>Debug Info:</strong></p>
-            <p>User: {JSON.stringify(user, null, 2)}</p>
-            <p>Employee ID: {employeeId}</p>
-            <p>Token: {token ? 'Present' : 'Missing'}</p>
-          </div>
         </div>
       </div>
     );
@@ -94,10 +351,6 @@ export default function TargetsPage() {
             </div>
           <p className="text-lg text-gray-600 mb-2">Failed to load performance data</p>
           <p className="text-sm text-gray-500">Please try refreshing the page</p>
-          <div className="mt-4 p-4 bg-red-50 rounded text-left text-xs">
-            <p><strong>Error Details:</strong></p>
-            <p>{JSON.stringify(error, null, 2)}</p>
-          </div>
         </div>
       </div>
     );
@@ -120,186 +373,126 @@ export default function TargetsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">My Performance Dashboard</h1>
-        <p className="text-gray-600">Detailed view of your targets vs achievements</p>
+    <div className={`min-h-screen ${
+      currentTheme.isDark ? 'bg-gray-900' : 'bg-gray-50'
+    }`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Header with Employee Info */}
+        <div className={`rounded-lg shadow p-3 sm:p-4 md:p-6 ${
+          currentTheme.isDark ? 'bg-gray-800' : 'bg-white'
+        }`}>
+          <h1 className={`text-xl sm:text-2xl font-bold mb-2 sm:mb-4 ${
+            currentTheme.isDark ? 'text-white' : 'text-gray-900'
+          }`}>
+            My Performance Dashboard
+          </h1>
+          <p className={currentTheme.isDark ? 'text-gray-300' : 'text-gray-600'}>
+            Detailed view of your targets vs achievements
+          </p>
 
         {/* Employee Info */}
         {employeeDetails && (
-          <div className="bg-blue-50 rounded-lg p-4 mt-4">
-            <div className="flex items-center justify-between">
+            <div className={`rounded-lg p-4 mt-4 ${
+              currentTheme.isDark ? 'bg-blue-500/20' : 'bg-blue-50'
+            }`}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{employeeDetails.employee.name}</h2>
-                <p className="text-gray-600">Cluster: {employeeDetails.employee.cluster} • City: {employeeDetails.employee.city}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Employee ID</p>
-                <p className="text-lg font-bold text-blue-600">{employeeDetails.employee.employee_id}</p>
-              </div>
-            </div>
+                  <p className={`text-xs ${currentTheme.isDark ? 'text-gray-400' : 'text-gray-600'} mb-1`}>Name</p>
+                  <h2 className={`text-sm font-semibold ${
+                    currentTheme.isDark ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    {employeeDetails.employee.name}
+                  </h2>
                 </div>
-              )}
+                <div>
+                  <p className={`text-xs ${currentTheme.isDark ? 'text-gray-400' : 'text-gray-600'} mb-1`}>Location</p>
+                  <p className={`text-sm ${currentTheme.isDark ? 'text-gray-300' : 'text-gray-900'}`}>
+                    {employeeDetails.employee.cluster} • {employeeDetails.employee.city}
+                  </p>
+                </div>
+                <div>
+                  <p className={`text-xs ${currentTheme.isDark ? 'text-gray-400' : 'text-gray-600'} mb-1`}>Employee ID</p>
+                  <p className={`text-sm font-semibold ${
+                    currentTheme.isDark ? 'text-blue-400' : 'text-blue-600'
+                  }`}>
+                    {employeeDetails.employee.employee_id}
+                  </p>
+                </div>
+              </div>
+                </div>
+          )}
+                </div>
+
+        {/* Performance Overview Card */}
+        <div className={`rounded-lg shadow p-3 sm:p-4 md:p-6 ${
+          currentTheme.isDark ? 'bg-gray-800' : 'bg-white'
+        }`}>
+          {/* Card Header with Day/Week Toggle */}
+          <div className="flex items-center justify-between mb-2 sm:mb-4 md:mb-6">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                currentTheme.isDark ? 'bg-purple-500/20' : 'bg-purple-500'
+              }`}>
+                <span className="text-xl">💰</span>
+              </div>
+              <h3 className={`text-xl font-bold ${
+                currentTheme.isDark ? 'text-white' : 'text-gray-900'
+              }`}>
+                Performance Overview
+              </h3>
             </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Performance */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Daily Performance ({employeeDetails?.daily.date})</h2>
-          </div>
-          {employeeDetails?.daily?.metrics?.length > 0 ? (
-            <div className="p-6">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">Metric</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Target</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Achieved</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Progress</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Earnings</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employeeDetails.daily.metrics.map((metric: any) => renderMetricRow(metric, 'daily'))}
-                    <tr className="bg-gray-50 font-semibold">
-                      <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-center">{employeeDetails.daily.totals.target.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">{employeeDetails.daily.totals.achievement.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">
-                        {employeeDetails.daily.totals.target > 0
-                          ? `${((employeeDetails.daily.totals.achievement / employeeDetails.daily.totals.target) * 100).toFixed(1)}%`
-                          : 'N/A'}
-                      </td>
-                      <td className="px-4 py-3 text-center text-green-600">
-                        {employeeDetails.daily.totals.earnings !== undefined && employeeDetails.daily.totals.earnings !== null
-                          ? formatCurrency(employeeDetails.daily.totals.earnings)
-                          : '₹0'}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                    </div>
-                  </div>
-              ) : (
-            <div className="p-8 text-center text-gray-500">
-              No daily performance data available
-                </div>
-              )}
+            {/* Day/Week Toggle */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('day')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  viewMode === 'day'
+                    ? 'bg-purple-500 text-white shadow-lg'
+                    : currentTheme.isDark
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                DAY
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  viewMode === 'week'
+                    ? 'bg-purple-500 text-white shadow-lg'
+                    : currentTheme.isDark
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                WEEK
+              </button>
             </div>
+          </div>
 
-        {/* Weekly Performance */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Weekly Performance</h2>
-          </div>
-          {employeeDetails?.weekly?.metrics?.length > 0 ? (
-            <div className="p-6">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">Metric</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Target</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Achieved</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Progress</th>
-                      <th className="px-4 py-2 text-center font-medium text-gray-700">Earnings</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employeeDetails.weekly.metrics.map((metric: any) => renderMetricRow(metric, 'weekly'))}
-                    <tr className="bg-gray-50 font-semibold">
-                      <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-center">{employeeDetails.weekly.totals.target.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">{employeeDetails.weekly.totals.achievement.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">
-                        {employeeDetails.weekly.totals.target > 0
-                          ? `${((employeeDetails.weekly.totals.achievement / employeeDetails.weekly.totals.target) * 100).toFixed(1)}%`
-                          : 'N/A'}
-                      </td>
-                      <td className="px-4 py-3 text-center text-green-600">
-                        {employeeDetails.weekly.totals.earnings !== undefined && employeeDetails.weekly.totals.earnings !== null
-                          ? formatCurrency(employeeDetails.weekly.totals.earnings)
-                          : '₹0'}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          {/* Render Performance View based on viewMode */}
+          {viewMode === 'day' ? (
+            <>
+              {renderPerformanceView(
+                employeeDetails.daily?.metrics || [],
+                employeeDetails.daily?.totals || {},
+                employeeDetails.daily?.employee_variable_pay || 0,
+                'day'
+              )}
+            </>
           ) : (
-            <div className="p-8 text-center text-gray-500">
-              No weekly performance data available
-                </div>
+            <>
+              {renderPerformanceView(
+                employeeDetails.weekly?.metrics || [],
+                employeeDetails.weekly?.totals || {},
+                employeeDetails.weekly?.employee_variable_pay || 0,
+                'week'
               )}
-            </div>
-                    </div>
-
-      {/* Performance Summary */}
-      {employeeDetails && (employeeDetails.daily.metrics.length > 0 || employeeDetails.weekly.metrics.length > 0) && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-800">Daily Achievement</p>
-                  <p className="text-2xl font-bold text-green-900">{employeeDetails.daily.totals.achievement.toLocaleString()}</p>
-                </div>
-                <div className="text-green-500">
-                  <span className="text-2xl">📈</span>
-            </div>
-          </div>
+            </>
+          )}
         </div>
-
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                  <div>
-                  <p className="text-sm font-medium text-blue-800">Weekly Achievement</p>
-                  <p className="text-2xl font-bold text-blue-900">{employeeDetails.weekly.totals.achievement.toLocaleString()}</p>
-                </div>
-                <div className="text-blue-500">
-                  <span className="text-2xl">📊</span>
-                </div>
-              </div>
-                  </div>
-
-            <div className="bg-yellow-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                  <div>
-                  <p className="text-sm font-medium text-yellow-800">Daily Earnings</p>
-                  <p className="text-2xl font-bold text-yellow-900">
-                    {employeeDetails.daily.totals.earnings !== undefined && employeeDetails.daily.totals.earnings !== null
-                      ? formatCurrency(employeeDetails.daily.totals.earnings)
-                      : '₹0'}
-                  </p>
-                </div>
-                <div className="text-yellow-500">
-                  <span className="text-2xl">💰</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-800">Weekly Earnings</p>
-                  <p className="text-2xl font-bold text-purple-900">
-                    {employeeDetails.weekly.totals.earnings !== undefined && employeeDetails.weekly.totals.earnings !== null
-                      ? formatCurrency(employeeDetails.weekly.totals.earnings)
-                      : '₹0'}
-                  </p>
-                </div>
-                <div className="text-purple-500">
-                  <span className="text-2xl">💎</span>
-                </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      </div>
     </div>
   );
 }

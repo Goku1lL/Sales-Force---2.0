@@ -6,40 +6,71 @@ const router = Router();
 
 router.get('/assigned/:employeeId', authMiddleware, async (req, res, next) => {
   try {
-    const employeeId = Number(req.params.employeeId);
+    const employeeId = req.params.employeeId;
     const prisma = getPrisma();
-    // Approximation: customers in localities mapped to executive current week
+    // Fetch target customers for this employee
     const rows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT c.CustomerId, c.Customer, c.City, c.ContactNumber, c.CustomerSegment, c.CustomerType, c.Status, c.ExecutiveId, c.Executive
-       FROM FnVCustomer_Dim c
-       WHERE c.Status = 'active'
-       ORDER BY c.CustomerId DESC LIMIT 200`
-    );
+      `SELECT 
+        Id,
+        employee_id,
+        customer_id,
+        customername,
+        contactnumber,
+        LastOrder,
+        description,
+        Priority
+       FROM SA_HomePageTargetCustomers
+       WHERE employee_id = ? AND deleted = 0
+       ORDER BY Priority ASC, LastOrder DESC
+       LIMIT 100`
+    , employeeId);
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
 });
 
 router.get('/inactive/:employeeId', authMiddleware, async (req, res, next) => {
   try {
-    const employeeId = Number(req.params.employeeId);
+    const employeeId = req.params.employeeId;
     const prisma = getPrisma();
     const rows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT CustomerId, Customer, City, ContactNumber, CustomerSegment, CustomerType, Status, ExecutiveId, Executive
-       FROM FnVCustomer_Dim WHERE Status = 'active'
-       ORDER BY CustomerId ASC LIMIT 200`
-    );
+      `SELECT 
+        Id,
+        employee_id,
+        customer_id,
+        customername,
+        contactnumber,
+        LastOpened,
+        description,
+        Priority
+       FROM SA_HomePageAppFunnelCustomers
+       WHERE employee_id = ?
+       ORDER BY LastOpened DESC, Priority ASC
+       LIMIT 100`
+    , employeeId);
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
 });
 
 router.get('/high-value/:employeeId', authMiddleware, async (req, res, next) => {
   try {
-    const employeeId = Number(req.params.employeeId);
+    const employeeId = req.params.employeeId;
     const prisma = getPrisma();
+    // For high-value customers, fetch target customers sorted by priority
     const rows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT CustomerId, Customer, City, ContactNumber, CustomerSegment, CustomerType, Status, ExecutiveId, Executive
-       FROM FnVCustomer_Dim WHERE Status = 'active' ORDER BY CustomerId DESC LIMIT 200`
-    );
+      `SELECT 
+        Id,
+        employee_id,
+        customer_id,
+        customername,
+        contactnumber,
+        LastOrder,
+        description,
+        Priority
+       FROM SA_HomePageTargetCustomers
+       WHERE employee_id = ? AND deleted = 0 AND Priority = 1
+       ORDER BY Priority ASC, LastOrder DESC
+       LIMIT 50`
+    , employeeId);
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
 });

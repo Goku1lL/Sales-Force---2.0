@@ -16,12 +16,13 @@ import { rateLimit } from './middleware/rateLimit';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ 
+app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'https://your-app.vercel.app',
-    'http://localhost:5173' // For local development
-  ], 
-  credentials: true 
+    'http://localhost:5173', // For local development
+    'http://127.0.0.1:5173' // Also allow 127.0.0.1
+  ],
+  credentials: true
 }));
 app.use(rateLimit);
 app.use(json());

@@ -143,12 +143,12 @@ router.post('/login', async (req, res, next) => {
     const refreshSecret = process.env.JWT_REFRESH_SECRET as string || secret;
 
     const accessToken = jwt.sign(
-      { sub: Number(user.employee_id), name: String(user.full_name), role: String(user.role) },
+      { sub: String(user.employee_id), name: String(user.full_name), role: String(user.role) },
       secret,
       { expiresIn: '7d' }
     );
     const refreshToken = jwt.sign(
-      { sub: Number(user.employee_id) },
+      { sub: String(user.employee_id) },
       refreshSecret,
       { expiresIn: '30d' }
     );
@@ -158,7 +158,7 @@ router.post('/login', async (req, res, next) => {
       refreshToken,
       user: {
         id: Number(user.Id),
-        employee_id: Number(user.employee_id),
+        employee_id: String(user.employee_id),
         name: String(user.full_name),
         email: String(user.email),
         role: String(user.role),

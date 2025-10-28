@@ -23,19 +23,10 @@ export default function LoginPage() {
       return;
     }
 
-    // Validate employee ID if it's not an email
-    if (!isEmail(loginInput)) {
-      const employeeId = Number(loginInput);
-      if (isNaN(employeeId) || employeeId <= 0) {
-        setFormError('Please enter a valid employee ID (numbers only) or email address');
-        return;
-      }
-    }
-
     try {
       const loginData = isEmail(loginInput) 
         ? { email: loginInput, password }
-        : { employee_id: Number(loginInput), password };
+        : { employee_id: loginInput, password };
       
       await login(loginData).unwrap();
       navigate('/', { replace: true });
@@ -75,7 +66,6 @@ export default function LoginPage() {
               autoComplete="username" 
             />
             <p className="text-xs text-gray-500 mt-1">
-              
             </p>
           </div>
           <div>

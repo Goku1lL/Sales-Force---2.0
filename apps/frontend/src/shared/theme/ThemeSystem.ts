@@ -166,7 +166,7 @@ export interface ThemeContextType {
 export class ThemeUtils {
   static getCardClasses(theme: ThemeConfig, accent: 'amber' | 'purple' = 'amber') {
     const baseClasses = [
-      'relative rounded-2xl p-6 overflow-hidden',
+      'relative rounded-2xl p-3 sm:p-4 md:p-6 overflow-hidden',
       theme.components.card.background,
       theme.components.card.border,
       theme.components.card.shadow

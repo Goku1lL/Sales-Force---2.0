@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 
 export interface AuthPayload {
-  sub: number;
+  sub: string;
   name?: string;
   role?: string;
 }
@@ -19,12 +19,12 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
     let user: AuthPayload;
     if (typeof decoded === 'string') {
       // minimal
-      user = { sub: 0 };
+      user = { sub: '' };
     } else {
       const subRaw = decoded.sub as unknown;
-      const subNum = typeof subRaw === 'string' ? Number(subRaw) : typeof subRaw === 'number' ? subRaw : 0;
+      const subStr = typeof subRaw === 'string' ? subRaw : typeof subRaw === 'number' ? String(subRaw) : '';
       user = {
-        sub: subNum,
+        sub: subStr,
         name: typeof decoded["name"] === 'string' ? decoded["name"] : undefined,
         role: typeof decoded["role"] === 'string' ? decoded["role"] : undefined,
       };

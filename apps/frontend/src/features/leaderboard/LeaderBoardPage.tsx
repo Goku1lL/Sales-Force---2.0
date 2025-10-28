@@ -3,8 +3,82 @@ import { useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery, useGetUserPr
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
 
+function EmployeeDetailsCard({ 
+  employeeDetails, 
+  onClose,
+  renderSlabBadge,
+  renderMetricSection
+}: { 
+  employeeDetails: any; 
+  onClose: () => void;
+  renderSlabBadge: (slab: any) => JSX.Element;
+  renderMetricSection: (metrics: any[]) => JSX.Element | null;
+}) {
+  const [localPeriod, setLocalPeriod] = useState<'day' | 'week'>('day');
+
+  if (!employeeDetails) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Loading employee details...
+      </div>
+    );
+  }
+
+  const currentMetrics = localPeriod === 'day' ? employeeDetails.daily.metrics : employeeDetails.weekly.metrics;
+
+  return (
+    <>
+      {/* Compact Header */}
+      <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">{employeeDetails.employee.name}</h2>
+          <p className="text-sm text-gray-600">ID: {employeeDetails.employee.employee_id}</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Day/Week Toggle */}
+      <div className="px-6 py-4 border-b border-gray-200">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setLocalPeriod('day')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              localPeriod === 'day'
+                ? 'bg-purple-500 text-white shadow-lg'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            DAY
+          </button>
+          <button
+            onClick={() => setLocalPeriod('week')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              localPeriod === 'week'
+                ? 'bg-purple-500 text-white shadow-lg'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            WEEK
+          </button>
+        </div>
+      </div>
+
+      {/* Metrics Section */}
+      <div className="p-6">
+        {renderMetricSection(currentMetrics)}
+      </div>
+    </>
+  );
+}
+
 export default function LeaderBoardPage() {
   const [activeTab, setActiveTab] = useState<'cluster' | 'city'>('cluster');
+  const [period, setPeriod] = useState<'day' | 'week'>('week');
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const { user, token } = useSelector((s: RootState) => s.auth);
   const employeeId = user?.employee_id;
@@ -15,8 +89,14 @@ export default function LeaderBoardPage() {
   }
 
   const { data: userProfile } = useGetUserProfileQuery(employeeId, { skip: !employeeId });
-  const { data: clusterData } = useGetClusterLeaderboardQuery(userProfile?.cluster || '', { skip: !userProfile?.cluster });
-  const { data: cityData } = useGetCityLeaderboardQuery(Number(userProfile?.CityId) || 0, { skip: !userProfile?.CityId });
+  const { data: clusterData } = useGetClusterLeaderboardQuery(
+    { cluster: userProfile?.cluster || '', period },
+    { skip: !userProfile?.cluster }
+  );
+  const { data: cityData } = useGetCityLeaderboardQuery(
+    { cityId: Number(userProfile?.CityId) || 0, period },
+    { skip: !userProfile?.CityId }
+  );
   const { data: employeeDetails } = useGetEmployeeDetailsQuery(
     selectedEmployee || '', 
     {
@@ -38,27 +118,103 @@ export default function LeaderBoardPage() {
     return 'bg-red-500';
   };
 
-  const renderMetricRow = (metric: any, type: 'daily' | 'weekly') => (
-    <tr key={`${type}-${metric.metric}`} className="border-b border-gray-200">
-      <td className="px-4 py-2 font-medium">{metric.metric}</td>
-      <td className="px-4 py-2 text-center">{metric.target.toLocaleString()}</td>
-      <td className="px-4 py-2 text-center font-semibold">{metric.achievement.toLocaleString()}</td>
-      <td className="px-4 py-2">
-        <div className="flex items-center space-x-2">
+  const getSlabEmoji = (slabSegment: string) => {
+    if (slabSegment === 'slab1') return '🥉';
+    if (slabSegment === 'slab2') return '🥈';
+    if (slabSegment === 'slab3') return '🥇';
+    return '🏅';
+  };
+
+  const getMetricEmoji = (metricName: string) => {
+    if (metricName === 'FruitsAB') return '🍎';
+    if (metricName === 'GT OC') return '📦';
+    if (metricName === 'VegetablesAB') return '🥬';
+    return '📊';
+  };
+
+  const renderSlabBadge = (slab: any) => {
+    const achievement = Number(slab.achievement || 0);
+    const target = Number(slab.target || 0);
+    const achievementPercentage = slab.target > 0 ? ((achievement / target) * 100) : 0;
+    const isCompleted = achievementPercentage >= 100;
+
+    return (
+      <div
+        key={slab.slab_Segment}
+        className={`p-4 rounded-lg border text-center ${
+          isCompleted
+            ? 'bg-green-50 border-green-200'
+            : 'bg-gray-50 border-gray-200'
+        }`}
+      >
+        <div className="text-2xl mb-2">{getSlabEmoji(slab.slab_Segment)}</div>
+        <div className="font-semibold text-sm mb-1">
+          {slab.slab_Segment?.toUpperCase() || 'DEFAULT'}
+        </div>
+        <div className={`text-xs mb-2 ${isCompleted ? 'text-green-600' : 'text-gray-500'}`}>
+          {isCompleted ? 'COMPLETED 🎉' : 'ACTIVE ⚡'}
+        </div>
+        <div className="text-lg font-bold text-gray-800">
+          {achievement.toLocaleString()} / {target.toLocaleString()}
+        </div>
+        <div className="flex items-center justify-center gap-1 mt-2">
           <div className="flex-1 bg-gray-200 rounded-full h-2">
             <div
-              className={`h-2 rounded-full ${getProgressBarColor(metric.achievement_percentage)}`}
-              style={{ width: `${Math.min(metric.achievement_percentage, 100)}%` }}
+              className={`h-2 rounded-full ${getProgressBarColor(achievementPercentage)}`}
+              style={{ width: `${Math.min(achievementPercentage, 100)}%` }}
             ></div>
           </div>
-          <span className="text-sm font-medium w-12">{metric.achievement_percentage.toFixed(1)}%</span>
+          <span className="text-xs font-medium w-10">{achievementPercentage.toFixed(1)}%</span>
         </div>
-      </td>
-      <td className="px-4 py-2 text-center font-semibold text-green-600">
-        {metric.earnings !== undefined && metric.earnings !== null ? formatCurrency(metric.earnings) : '₹0'}
-      </td>
-    </tr>
-  );
+      </div>
+    );
+  };
+
+  const renderMetricSection = (metrics: any[]) => {
+    // Group by metric name
+    const grouped = metrics.reduce((acc: Record<string, any[]>, metric: any) => {
+      const key = metric.metric || 'Unknown';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(metric);
+      return acc;
+    }, {});
+
+    const groups = Object.entries(grouped);
+    
+    if (groups.length === 0) return null;
+
+    return groups.map(([metricName, slabMetrics]) => {
+      const totalTarget = slabMetrics.reduce((sum, m) => sum + Number(m.target || 0), 0);
+      const totalAchievement = slabMetrics.reduce((sum, m) => sum + Number(m.achievement || 0), 0);
+      const avgContribution = slabMetrics[0]?.contribution || 0;
+      const remaining = totalTarget - totalAchievement;
+
+      return (
+        <div
+          key={metricName}
+          className="p-4 rounded-lg border bg-gray-50 border-gray-200 mb-4"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{getMetricEmoji(metricName)}</span>
+              <span className="font-bold text-lg">{metricName}</span>
+            </div>
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap bg-blue-100 text-blue-700">
+              {(Number(avgContribution) * 100).toFixed(0)}% contribution
+            </span>
+          </div>
+
+          <div className="text-sm text-gray-600 mb-4">
+            Units remaining: <span className="font-semibold text-orange-600">{remaining.toLocaleString()}</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {slabMetrics.map(slab => renderSlabBadge(slab))}
+          </div>
+        </div>
+      );
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -69,15 +225,19 @@ export default function LeaderBoardPage() {
         {/* User Info */}
         {userProfile && (
           <div className="bg-blue-50 rounded-lg p-4 mb-4">
-            <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{userProfile.name}</h2>
-                <p className="text-gray-600">Cluster: {userProfile.cluster} • City: {userProfile.city}</p>
+                <p className="text-xs text-gray-600 mb-1">Name</p>
+                <h2 className="text-sm font-semibold text-gray-900">{userProfile.name}</h2>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Your Rankings</p>
-                <p className="text-lg font-bold text-blue-600">
-                  #{userProfile.cluster_rank} in Cluster • #{userProfile.city_rank} in City
+              <div>
+                <p className="text-xs text-gray-600 mb-1">Location</p>
+                <p className="text-sm text-gray-900">{userProfile.cluster} • {userProfile.city}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600 mb-1">Your Rankings</p>
+                <p className="text-sm font-semibold text-blue-600">
+                  Cluster #{userProfile.cluster_rank} • City #{userProfile.city_rank}
                 </p>
               </div>
             </div>
@@ -85,7 +245,8 @@ export default function LeaderBoardPage() {
         )}
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex space-x-1">
           <button
             onClick={() => setActiveTab('cluster')}
             className={`px-4 py-2 rounded-lg font-medium ${
@@ -94,7 +255,7 @@ export default function LeaderBoardPage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            Cluster Leaderboard ({userProfile?.cluster})
+            Cluster
           </button>
           <button
             onClick={() => setActiveTab('city')}
@@ -104,8 +265,33 @@ export default function LeaderBoardPage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            City Leaderboard ({userProfile?.city})
+            City
           </button>
+          </div>
+          
+          {/* Period Toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPeriod('day')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                period === 'day'
+                  ? 'bg-purple-500 text-white shadow-lg'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              DAY
+            </button>
+            <button
+              onClick={() => setPeriod('week')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                period === 'week'
+                  ? 'bg-purple-500 text-white shadow-lg'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              WEEK
+            </button>
+          </div>
         </div>
       </div>
 
@@ -116,6 +302,9 @@ export default function LeaderBoardPage() {
             <h2 className="text-xl font-semibold text-gray-900">
               {activeTab === 'cluster' ? 'Cluster Rankings' : 'City Rankings'}
             </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {period === 'day' ? 'Daily Target Achievement' : 'Weekly Target Achievement'}
+            </p>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {leaderboardData?.length > 0 ? (
@@ -139,20 +328,37 @@ export default function LeaderBoardPage() {
                           #{employee.rank}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{employee.Name || `Employee ${employee.employee_id}`}</p>
-                          <p className="text-sm text-gray-600">
+                          <p className="font-medium text-sm text-gray-900">{employee.Name || `Employee ${employee.employee_id}`}</p>
+                          <p className="text-xs text-gray-600">
                             {activeTab === 'cluster' ? employee.cluster : employee.city_name}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-blue-600">
-                          {employee.weekly_achievements !== undefined && employee.weekly_achievements !== null
-                            ? employee.weekly_achievements.toLocaleString()
-                            : '0'
-                          }
-                        </p>
-                        <p className="text-xs text-gray-500">Weekly Units</p>
+                        {employee.achievement_percentage !== undefined && employee.achievement_percentage !== null ? (
+                          <>
+                            <p className="text-sm font-semibold text-blue-600">
+                              {Number(employee.achievement_percentage).toFixed(1)}%
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {period === 'day' ? 'Daily Target' : 'Weekly Target'}
+                            </p>
+                          </>
+                        ) : employee.weekly_achievements !== undefined && employee.weekly_achievements !== null ? (
+                          <>
+                            <p className="text-sm font-semibold text-blue-600">
+                              {employee.weekly_achievements.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-gray-500">Units</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-blue-600">0%</p>
+                            <p className="text-xs text-gray-500">
+                              {period === 'day' ? 'Daily Target' : 'Weekly Target'}
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -170,107 +376,12 @@ export default function LeaderBoardPage() {
         <div className="bg-white rounded-lg shadow">
           {selectedEmployee ? (
             <>
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">Employee Details</h2>
-              </div>
-              {employeeDetails ? (
-                <div className="p-6 space-y-6">
-                  {/* Employee Info */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{employeeDetails.employee.name}</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-600">Employee ID:</span>
-                        <span className="ml-2">{employeeDetails.employee.employee_id}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-600">Cluster:</span>
-                        <span className="ml-2">{employeeDetails.employee.cluster}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-600">City:</span>
-                        <span className="ml-2">{employeeDetails.employee.city}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Daily Performance */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-3">Daily Performance ({employeeDetails.daily.date})</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-2 text-left font-medium text-gray-700">Metric</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Target</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Achieved</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Progress</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Earnings</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {employeeDetails.daily.metrics.map((metric: any) => renderMetricRow(metric, 'daily'))}
-                          <tr className="bg-gray-50 font-semibold">
-                            <td className="px-4 py-3">TOTAL</td>
-                            <td className="px-4 py-3 text-center">{employeeDetails.daily.totals.target.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-center">{employeeDetails.daily.totals.achievement.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-center">
-                              {employeeDetails.daily.totals.target > 0
-                                ? `${((employeeDetails.daily.totals.achievement / employeeDetails.daily.totals.target) * 100).toFixed(1)}%`
-                                : 'N/A'}
-                            </td>
-                            <td className="px-4 py-3 text-center text-green-600">
-                              {employeeDetails.daily.totals.earnings !== undefined && employeeDetails.daily.totals.earnings !== null
-                                ? formatCurrency(employeeDetails.daily.totals.earnings)
-                                : '₹0'}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Weekly Performance */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-3">Weekly Performance</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-2 text-left font-medium text-gray-700">Metric</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Target</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Achieved</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Progress</th>
-                            <th className="px-4 py-2 text-center font-medium text-gray-700">Earnings</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {employeeDetails.weekly.metrics.map((metric: any) => renderMetricRow(metric, 'weekly'))}
-                          <tr className="bg-gray-50 font-semibold">
-                            <td className="px-4 py-3">TOTAL</td>
-                            <td className="px-4 py-3 text-center">{employeeDetails.weekly.totals.target.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-center">{employeeDetails.weekly.totals.achievement.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-center">
-                              {employeeDetails.weekly.totals.target > 0
-                                ? `${((employeeDetails.weekly.totals.achievement / employeeDetails.weekly.totals.target) * 100).toFixed(1)}%`
-                                : 'N/A'}
-                            </td>
-                            <td className="px-4 py-3 text-center text-green-600">
-                              {employeeDetails.weekly.totals.earnings !== undefined && employeeDetails.weekly.totals.earnings !== null
-                                ? formatCurrency(employeeDetails.weekly.totals.earnings)
-                                : '₹0'}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-8 text-center text-gray-500">
-                  Loading employee details...
-                </div>
-              )}
+              <EmployeeDetailsCard
+                employeeDetails={employeeDetails}
+                onClose={() => setSelectedEmployee(null)}
+                renderSlabBadge={renderSlabBadge}
+                renderMetricSection={renderMetricSection}
+              />
             </>
           ) : (
             <div className="p-8 text-center text-gray-500">

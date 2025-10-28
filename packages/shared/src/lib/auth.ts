@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import type { VercelRequest } from '@vercel/node';
 
-export function verifyToken(req: VercelRequest): { sub: number; role: string } | null {
+export function verifyToken(req: VercelRequest): { sub: string; role: string } | null {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return null;
 
@@ -11,7 +11,9 @@ export function verifyToken(req: VercelRequest): { sub: number; role: string } |
   try {
     const decoded = jwt.verify(token, secret) as unknown;
     if (typeof decoded === 'object' && decoded !== null && 'sub' in decoded && 'role' in decoded) {
-      return decoded as { sub: number; role: string };
+      const subRaw = (decoded as any).sub;
+      const sub = typeof subRaw === 'string' ? subRaw : typeof subRaw === 'number' ? String(subRaw) : '';
+      return { sub, role: String((decoded as any).role) };
     }
     return null;
   } catch {

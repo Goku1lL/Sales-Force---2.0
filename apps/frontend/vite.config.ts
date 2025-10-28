@@ -8,14 +8,6 @@ export default defineConfig({
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json']
   },
   server: {
-    port: 5173,
-    proxy: {
-      // Proxy all API requests to local backend server
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        rewrite: (path) => path
-      }
-    }
+    port: 5173
   }
 });

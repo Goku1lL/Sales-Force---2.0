@@ -81,38 +81,84 @@ async function handleLogin(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: 'employee_id or email and password are required' });
     }
 
-    // For now, use mock authentication until database is properly configured
-    // TODO: Replace with real database queries
-    if (password === 'password123') {
-      const secret = process.env.JWT_SECRET as string || 'fallback-secret';
-      const refreshSecret = process.env.JWT_REFRESH_SECRET as string || secret;
+    const prisma = getPrisma();
 
-      const accessToken = jwt.sign(
-        { sub: Number(employee_id) || 1, name: 'Test User', role: 'executive' },
-        secret,
-        { expiresIn: '7d' }
+    // Query user from database
+    let user: any;
+    if (employee_id) {
+      const result: any[] = await prisma.$queryRawUnsafe(
+        `SELECT Id, employee_id, password_hash, full_name, email, role, status
+         FROM SalesApp_Login
+         WHERE employee_id = ? AND deleted = 0
+         LIMIT 1`,
+        employee_id
       );
-      const refreshToken = jwt.sign(
-        { sub: Number(employee_id) || 1 },
-        refreshSecret,
-        { expiresIn: '30d' }
+      user = result[0];
+    } else if (email) {
+      const result: any[] = await prisma.$queryRawUnsafe(
+        `SELECT Id, employee_id, password_hash, full_name, email, role, status
+         FROM SalesApp_Login
+         WHERE email = ? AND deleted = 0
+         LIMIT 1`,
+        email
       );
-
-      return res.json({
-        token: accessToken,
-        refreshToken,
-        user: {
-          id: 1,
-          employee_id: Number(employee_id) || 1,
-          name: 'Test User',
-          email: email || 'test@example.com',
-          role: 'executive',
-          status: 'active'
-        }
-      });
+      user = result[0];
     }
 
-    return res.status(401).json({ message: 'Invalid credentials' });
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Check if account is active
+    if (user.status !== 'active') {
+      return res.status(403).json({ message: 'Account is not active. Please contact administrator.' });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Update last login
+    await prisma.$executeRawUnsafe(
+      `UPDATE SalesApp_Login SET last_login = NOW() WHERE Id = ?`,
+      user.Id
+    );
+
+    // Generate tokens
+    const secret = process.env.JWT_SECRET as string;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET as string || secret;
+
+    const accessToken = jwt.sign(
+      {
+        sub: Number(user.Id),
+        name: user.full_name,
+        role: user.role,
+        employee_id: user.employee_id
+      },
+      secret,
+      { expiresIn: '7d' }
+    );
+
+    const refreshToken = jwt.sign(
+      { sub: Number(user.Id) },
+      refreshSecret,
+      { expiresIn: '30d' }
+    );
+
+    return res.json({
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: Number(user.Id),
+        employee_id: user.employee_id,
+        name: user.full_name,
+        email: user.email,
+        role: user.role,
+        status: user.status
+      }
+    });
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -126,17 +172,69 @@ async function handleSignup(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { email, full_name, password } = req.body || {};
+    const { email, full_name, password, employee_id, role } = req.body || {};
     if (!email || !full_name || !password) {
-      return res.status(400).json({ message: 'email, full_name, password required' });
+      return res.status(400).json({ message: 'email, full_name, and password are required' });
     }
 
-    // Mock signup for now - replace with real database operations later
-    const secret = process.env.JWT_SECRET as string || 'fallback-secret';
-    const token = jwt.sign({ email }, secret, { expiresIn: '2h' });
+    const prisma = getPrisma();
 
-    return res.json({
-      message: 'Signup successful. Account created.',
+    // Check if user already exists
+    const existingUsers: any[] = await prisma.$queryRawUnsafe(
+      `SELECT Id FROM SalesApp_Login
+       WHERE (email = ? OR employee_id = ?) AND deleted = 0
+       LIMIT 1`,
+      email,
+      employee_id || ''
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ message: 'User with this email or employee ID already exists' });
+    }
+
+    // Hash password
+    const password_hash = await bcrypt.hash(password, 12);
+
+    // Insert new user
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO SalesApp_Login
+       (employee_id, password_hash, full_name, email, role, status, created_at, updated_at, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), 0)`,
+      employee_id || null,
+      password_hash,
+      full_name,
+      email,
+      role || 'executive',
+      'pending' // Status is 'pending' until email verification
+    );
+
+    // Generate verification token
+    const secret = process.env.JWT_SECRET as string;
+    const token = jwt.sign({ email }, secret, { expiresIn: '24h' });
+
+    // Send verification email (if SMTP is configured)
+    const verificationLink = `${getBaseUrl(req)}/verify?token=${token}`;
+
+    if (process.env.SMTP_HOST) {
+      await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: email,
+        subject: 'Verify your account',
+        text: `Click to verify your account: ${verificationLink}`,
+        html: `
+          <h2>Welcome to Sales Force App!</h2>
+          <p>Please verify your account by clicking the link below:</p>
+          <p><a href="${verificationLink}">Verify Account</a></p>
+          <p>This link will expire in 24 hours.</p>
+        `
+      });
+    } else {
+      // For development - log the verification link
+      console.log(`🔗 Verification link for ${email}: ${verificationLink}`);
+    }
+
+    return res.status(201).json({
+      message: 'Signup successful. Please check your email to verify your account.',
       token: token
     });
   } catch (error) {

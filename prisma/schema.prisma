@@ -2755,6 +2755,7 @@ model DayTargets {
   slab_Segment    String?   @db.VarChar(400)
   contribution    Decimal?  @db.Decimal(10, 2)
   variable_pay    Decimal?  @db.Decimal(10, 2)
+  incentive_percent Decimal? @db.Decimal(10, 2)
   daycontribution Decimal?  @db.Decimal(10, 2)
   created_at      DateTime? @default(now()) @db.Timestamp(0)
   updated_at      DateTime? @default(now()) @db.Timestamp(0)

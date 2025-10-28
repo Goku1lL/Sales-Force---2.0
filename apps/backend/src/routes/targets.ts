@@ -10,7 +10,7 @@ router.get('/weekly/:employeeId/:yearweek', authMiddleware, async (req, res, nex
     const prisma = getPrisma();
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM WeekTargets WHERE employee_id = ? AND yearweek = ? AND deleted = 0 ORDER BY metric`,
-      String(employeeId), Number(yearweek)
+      employeeId, Number(yearweek)
     );
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
@@ -22,7 +22,7 @@ router.get('/daily/:employeeId/:date', authMiddleware, async (req, res, next) =>
     const prisma = getPrisma();
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM DayTargets WHERE employee_id = ? AND date = ? AND deleted = 0 ORDER BY metric`,
-      String(employeeId), date
+      employeeId, date
     );
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
@@ -41,11 +41,14 @@ router.get('/detailed/daily/:employeeId/:date', authMiddleware, async (req, res,
         date,
         metric,
         target,
-        unit
+        unit,
+        slab_Segment,
+        contribution,
+        variable_pay
       FROM DayTargets 
       WHERE employee_id = ? AND date = ? AND deleted = 0
-      ORDER BY metric
-    `, String(employeeId), date);
+      ORDER BY metric, slab_Segment
+    `, employeeId, date);
     
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }
@@ -63,11 +66,14 @@ router.get('/detailed/weekly/:employeeId/:yearweek', authMiddleware, async (req,
         yearweek,
         metric,
         target,
-        unit
+        unit,
+        slab_Segment,
+        contribution,
+        variable_pay
       FROM WeekTargets 
       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
-      ORDER BY metric
-    `, String(employeeId), Number(yearweek));
+      ORDER BY metric, slab_Segment
+    `, employeeId, Number(yearweek));
     
     res.json({ status: 'success', data: rows });
   } catch (err) { next(err); }

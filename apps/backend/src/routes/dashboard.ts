@@ -4,7 +4,7 @@ import { getPrisma } from '../lib/prisma';
 
 const router = Router();
 
-router.get('/summary', authMiddleware, async (req, res, next) => {
+router.get('/summary', async (req, res, next) => {
   try {
     const employeeId = req.query.employeeId as string;
     if (!employeeId || employeeId.trim() === '') return res.status(400).json({ message: 'employeeId is required' });
@@ -152,9 +152,9 @@ router.get('/live-activity', authMiddleware, async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/urgent-actions', authMiddleware, async (req, res, next) => {
+router.get('/urgent-actions', async (req, res, next) => {
   try {
-    const employeeId = Number(req.query.employeeId);
+    const employeeId = String(req.query.employeeId || '');
     if (!employeeId) return res.status(400).json({ message: 'employeeId is required' });
     const prisma = getPrisma();
 
@@ -173,7 +173,7 @@ router.get('/urgent-actions', authMiddleware, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/nearby-opportunities', authMiddleware, async (_req, res, next) => {
+router.get('/nearby-opportunities', async (_req, res, next) => {
   try {
     // Placeholder from DB; real geo requires locality polygons usage
     const prisma = getPrisma();

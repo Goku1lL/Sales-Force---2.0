@@ -6,7 +6,7 @@ const router = Router();
 
 router.get('/breakdown/:employeeId/:period', authMiddleware, async (req, res, next) => {
   try {
-    const employeeId = Number(req.params.employeeId);
+    const employeeId = req.params.employeeId;
     const period = String(req.params.period);
     const prisma = getPrisma();
 

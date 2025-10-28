@@ -5,7 +5,7 @@ export const dashboardApi = api.injectEndpoints({
     getSummary: builder.query<any, string>({
       query: (employeeId) => `/dashboard/summary?employeeId=${employeeId}`,
     }),
-    getUrgentActions: builder.query<any[], number>({
+    getUrgentActions: builder.query<any[], string>({
       query: (employeeId) => `/dashboard/urgent-actions?employeeId=${employeeId}`,
     }),
     getNearbyOpportunities: builder.query<any[], void>({
