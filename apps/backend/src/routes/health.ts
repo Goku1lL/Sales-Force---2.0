@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.get('/health', async (req, res) => {
   try {
     // Check database connection
+    const prisma = getPrisma();
     await prisma.$queryRaw`SELECT 1`;
     
     res.status(200).json({
