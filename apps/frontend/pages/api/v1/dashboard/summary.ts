@@ -1,20 +1,18 @@
-import { NextRequest } from 'next/server';
-import { prisma } from '../lib/db';
-import { verifyToken, createResponse, createErrorResponse } from '../lib/auth';
+import { NextApiRequest, NextApiResponse } from 'next';
+import { PrismaClient } from '@prisma/client';
 
-export async function GET(request: NextRequest) {
+const prisma = new PrismaClient();
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    // Verify authentication
-    const authPayload = verifyToken(request);
-    if (!authPayload) {
-      return createErrorResponse('Unauthorized', 401);
-    }
-
-    const { searchParams } = new URL(request.url);
-    const employeeId = searchParams.get('employeeId');
+    const { employeeId } = req.query;
     
-    if (!employeeId || employeeId.trim() === '') {
-      return createErrorResponse('employeeId is required');
+    if (!employeeId || typeof employeeId !== 'string') {
+      return res.status(400).json({ error: 'employeeId is required' });
     }
 
     const today = new Date().toISOString().slice(0, 10);
@@ -96,9 +94,9 @@ export async function GET(request: NextRequest) {
       weeklyPotentialEarnings,
     };
 
-    return createResponse({ data: summary });
+    res.status(200).json({ data: summary });
   } catch (error) {
     console.error('Dashboard summary error:', error);
-    return createErrorResponse('Internal server error', 500);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
