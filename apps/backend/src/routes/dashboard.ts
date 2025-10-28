@@ -60,6 +60,14 @@ router.get('/summary', async (req, res, next) => {
     console.log('Date:', today);
     console.log('Raw daily data:', JSON.stringify(dailyData, null, 2));
 
+    // Let's also check if there are any achievements at all for this employee/date
+    const rawAchievements = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT * FROM DayAchievement 
+       WHERE employee_id = ? AND date = ? AND deleted = 0`,
+      employeeId, today
+    );
+    console.log('Raw achievements from DayAchievement table:', JSON.stringify(rawAchievements, null, 2));
+
     // Calculate performance-based percentages (achievement vs target in units)
     const todayAchievement = dailyData.reduce((a, r) => a + Number(r.achievement || 0), 0);
     const todayTargetUnits = dailyData.reduce((a, r) => a + Number(r.target || 0), 0);
