@@ -13,12 +13,15 @@ router.get('/summary', async (req, res, next) => {
     const today = new Date().toISOString().slice(0, 10);
 
     // Get daily targets and achievements - start with targets to ensure we always get them
-    const dailyData = await prisma.$queryRawUnsafe<any[]>(
+    // First try with slab_Segment join
+    let dailyData = await prisma.$queryRawUnsafe<any[]>(
       `SELECT
         dt.metric,
         dt.target,
         COALESCE(da.Achievement, 0) as achievement,
-        COALESCE(da.variable_pay, 0) as variable_pay
+        COALESCE(da.variable_pay, 0) as variable_pay,
+        dt.slab_Segment as target_slab,
+        da.slab_Segment as achievement_slab
        FROM DayTargets dt
        LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
          AND dt.date = da.date
@@ -28,6 +31,28 @@ router.get('/summary', async (req, res, next) => {
        WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0`,
       employeeId, today
     );
+
+    // If no achievements found with slab_Segment join, try without it
+    const totalAchievements = dailyData.reduce((sum, row) => sum + Number(row.achievement || 0), 0);
+    if (totalAchievements === 0) {
+      console.log('No achievements found with slab_Segment join, trying without...');
+      dailyData = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT
+          dt.metric,
+          dt.target,
+          COALESCE(da.Achievement, 0) as achievement,
+          COALESCE(da.variable_pay, 0) as variable_pay,
+          dt.slab_Segment as target_slab,
+          da.slab_Segment as achievement_slab
+         FROM DayTargets dt
+         LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
+           AND dt.date = da.date
+           AND dt.metric = da.metric
+           AND da.deleted = 0
+         WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0`,
+        employeeId, today
+      );
+    }
 
     // Debug logging to see what data we're getting
     console.log('=== DAILY DATA DEBUG ===');
