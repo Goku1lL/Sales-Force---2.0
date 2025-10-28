@@ -354,6 +354,13 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       employeeId, employeeId
     );
 
+    // Debug logging
+    console.log('=== EMPLOYEE DETAILS DEBUG ===');
+    console.log('Employee ID:', employeeId);
+    console.log('Date:', today);
+    console.log('Daily achievements raw:', JSON.stringify(dailyAchievements, null, 2));
+    console.log('Weekly achievements raw:', JSON.stringify(weeklyAchievements, null, 2));
+
     // Group by metric and calculate totals properly
     const dailyMetricGroups = dailyAchievements.reduce((groups: Record<string, any>, item) => {
       const metric = item.metric;
