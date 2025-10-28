@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { withAccelerate } from '@prisma/extension-accelerate';
 
 // PrismaClient is attached to the global object in production
 const globalForPrisma = globalThis as unknown as {
@@ -14,7 +15,7 @@ const prisma =
       },
     },
     log: ['error'],
-  });
+  }).$extends(withAccelerate());
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
