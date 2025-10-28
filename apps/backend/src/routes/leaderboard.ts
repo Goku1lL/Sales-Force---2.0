@@ -126,7 +126,6 @@ router.get('/cluster/:cluster', async (req, res, next) => {
                  AND da.date = CURDATE()
                LEFT JOIN DayTargets dt ON e.employee_id = dt.employee_id
                  AND dt.date = CURDATE()
-                 AND dt.slab_Segment = da.slab_Segment
                  AND dt.deleted = 0
                WHERE e.deleted = 0 AND e.cluster = ?
                GROUP BY e.employee_id, e.Name, e.cluster
@@ -159,7 +158,6 @@ router.get('/cluster/:cluster', async (req, res, next) => {
                  AND wa.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
                LEFT JOIN WeekTargets wt ON e.employee_id = wt.employee_id
                  AND wt.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
-                 AND wt.slab_Segment = wa.slab_Segment
                  AND wt.deleted = 0
                WHERE e.deleted = 0 AND e.cluster = ?
                GROUP BY e.employee_id, e.Name, e.cluster
@@ -204,7 +202,6 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
              AND da.date = CURDATE()
            LEFT JOIN DayTargets dt ON e.employee_id = dt.employee_id
              AND dt.date = CURDATE()
-             AND dt.slab_Segment = da.slab_Segment
              AND dt.deleted = 0
            WHERE e.deleted = 0 AND e.CityId = ?
            GROUP BY e.employee_id, e.Name, e.CityId, cd.City
@@ -239,7 +236,6 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
              AND wa.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
            LEFT JOIN WeekTargets wt ON e.employee_id = wt.employee_id
              AND wt.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
-             AND wt.slab_Segment = wa.slab_Segment
              AND wt.deleted = 0
            WHERE e.deleted = 0 AND e.CityId = ?
            GROUP BY e.employee_id, e.Name, e.CityId, cd.City
@@ -335,7 +331,6 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
        LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
          AND dt.date = da.date
          AND dt.metric = da.metric
-         AND dt.slab_Segment = da.slab_Segment
          AND da.deleted = 0
        WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0
        ORDER BY dt.metric, dt.slab_Segment`,
@@ -351,7 +346,6 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
        LEFT JOIN WeekAchievement wa ON wt.employee_id = wa.employee_id
          AND wt.yearweek = wa.yearweek
          AND wt.metric = wa.metric
-         AND wt.slab_Segment = wa.slab_Segment
          AND wa.deleted = 0
        WHERE wt.employee_id = ? AND wt.yearweek = (
          SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
