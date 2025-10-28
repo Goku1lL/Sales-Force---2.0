@@ -17,13 +17,27 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'https://sales-force-2-0-frontend.vercel.app',
-    'https://sales-force-2-0-frontend.vercel.app', // Vercel production URL
-    'http://localhost:5173', // For local development
-    'http://127.0.0.1:5173' // Also allow 127.0.0.1
-  ],
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      'https://sales-force-2-0-frontend.vercel.app',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      process.env.FRONTEND_URL
+    ].filter(Boolean); // Remove undefined values
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(rateLimit);
 app.use(json());
