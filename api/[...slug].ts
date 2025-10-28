@@ -1,6 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+  log: ['error', 'warn'],
+});
+
+// Handle BigInt serialization
+(BigInt.prototype as any).toJSON = function() {
+  return this.toString();
+};
 
 export default async function handler(req: any, res: any) {
   const { slug } = req.query;
@@ -19,15 +31,15 @@ export default async function handler(req: any, res: any) {
   } else if (cleanPath.startsWith('dashboard/live-activity')) {
     return await handleLiveActivity(req, res);
   } else if (cleanPath.startsWith('leaderboard/profile/')) {
-    return await handleLeaderboardProfile(req, res);
+    return await handleLeaderboardProfile(req, res, cleanPath);
   } else if (cleanPath.startsWith('leaderboard/employee-details/')) {
-    return await handleEmployeeDetails(req, res);
+    return await handleEmployeeDetails(req, res, cleanPath);
   } else if (cleanPath.startsWith('customers/assigned/')) {
-    return await handleAssignedCustomers(req, res);
+    return await handleAssignedCustomers(req, res, cleanPath);
   } else if (cleanPath.startsWith('customers/inactive/')) {
-    return await handleInactiveCustomers(req, res);
+    return await handleInactiveCustomers(req, res, cleanPath);
   } else if (cleanPath.startsWith('customers/high-value/')) {
-    return await handleHighValueCustomers(req, res);
+    return await handleHighValueCustomers(req, res, cleanPath);
   }
 
     return res.status(404).json({ error: 'Endpoint not found' });
@@ -235,7 +247,7 @@ async function handleLiveActivity(req: any, res: any) {
   return res.status(200).json({ data: liveActivity });
 }
 
-async function handleLeaderboardProfile(req: any, res: any) {
+async function handleLeaderboardProfile(req: any, res: any, cleanPath: string) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -269,7 +281,7 @@ async function handleLeaderboardProfile(req: any, res: any) {
   return res.status(200).json({ data: employee[0] });
 }
 
-async function handleEmployeeDetails(req: any, res: any) {
+async function handleEmployeeDetails(req: any, res: any, cleanPath: string) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -361,7 +373,7 @@ async function handleEmployeeDetails(req: any, res: any) {
   return res.status(200).json({ data: response });
 }
 
-async function handleAssignedCustomers(req: any, res: any) {
+async function handleAssignedCustomers(req: any, res: any, cleanPath: string) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -391,7 +403,7 @@ async function handleAssignedCustomers(req: any, res: any) {
   return res.status(200).json({ data: customers });
 }
 
-async function handleInactiveCustomers(req: any, res: any) {
+async function handleInactiveCustomers(req: any, res: any, cleanPath: string) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -421,7 +433,7 @@ async function handleInactiveCustomers(req: any, res: any) {
   return res.status(200).json({ data: customers });
 }
 
-async function handleHighValueCustomers(req: any, res: any) {
+async function handleHighValueCustomers(req: any, res: any, cleanPath: string) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
