@@ -1,23 +1,22 @@
-import { PrismaClient } from '@prisma/client';
-import { withAccelerate } from '@prisma/extension-accelerate';
+// Use dynamic import for Prisma in serverless environment
+let prisma: any;
 
-// PrismaClient is attached to the global object in production
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+const getPrismaClient = async () => {
+  if (!prisma) {
+    const { PrismaClient } = await import('@prisma/client');
+    const { withAccelerate } = await import('@prisma/extension-accelerate');
 
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
+    prisma = new PrismaClient({
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL,
+        },
       },
-    },
-    log: ['error'],
-  }).$extends(withAccelerate());
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+      log: ['error'],
+    }).$extends(withAccelerate());
+  }
+  return prisma;
+};
 
 // Handle BigInt serialization
 (BigInt.prototype as any).toJSON = function() {
@@ -29,28 +28,28 @@ export default async function handler(req: any, res: any) {
   const path = slug ? slug.join('/') : '';
 
   try {
-  // Route to appropriate handler based on path (handle both /api/v1/* and direct calls)
-  const cleanPath = path.startsWith('v1/') ? path.substring(3) : path;
+    // Route to appropriate handler based on path (handle both /api/v1/* and direct calls)
+    const cleanPath = path.startsWith('v1/') ? path.substring(3) : path;
 
-  if (cleanPath.startsWith('dashboard/summary')) {
-    return await handleDashboardSummary(req, res);
-  } else if (cleanPath.startsWith('dashboard/urgent-actions')) {
-    return await handleUrgentActions(req, res);
-  } else if (cleanPath.startsWith('dashboard/nearby-opportunities')) {
-    return await handleNearbyOpportunities(req, res);
-  } else if (cleanPath.startsWith('dashboard/live-activity')) {
-    return await handleLiveActivity(req, res);
-  } else if (cleanPath.startsWith('leaderboard/profile/')) {
-    return await handleLeaderboardProfile(req, res, cleanPath);
-  } else if (cleanPath.startsWith('leaderboard/employee-details/')) {
-    return await handleEmployeeDetails(req, res, cleanPath);
-  } else if (cleanPath.startsWith('customers/assigned/')) {
-    return await handleAssignedCustomers(req, res, cleanPath);
-  } else if (cleanPath.startsWith('customers/inactive/')) {
-    return await handleInactiveCustomers(req, res, cleanPath);
-  } else if (cleanPath.startsWith('customers/high-value/')) {
-    return await handleHighValueCustomers(req, res, cleanPath);
-  }
+    if (cleanPath.startsWith('dashboard/summary')) {
+      return await handleDashboardSummary(req, res);
+    } else if (cleanPath.startsWith('dashboard/urgent-actions')) {
+      return await handleUrgentActions(req, res);
+    } else if (cleanPath.startsWith('dashboard/nearby-opportunities')) {
+      return await handleNearbyOpportunities(req, res);
+    } else if (cleanPath.startsWith('dashboard/live-activity')) {
+      return await handleLiveActivity(req, res);
+    } else if (cleanPath.startsWith('leaderboard/profile/')) {
+      return await handleLeaderboardProfile(req, res, cleanPath);
+    } else if (cleanPath.startsWith('leaderboard/employee-details/')) {
+      return await handleEmployeeDetails(req, res, cleanPath);
+    } else if (cleanPath.startsWith('customers/assigned/')) {
+      return await handleAssignedCustomers(req, res, cleanPath);
+    } else if (cleanPath.startsWith('customers/inactive/')) {
+      return await handleInactiveCustomers(req, res, cleanPath);
+    } else if (cleanPath.startsWith('customers/high-value/')) {
+      return await handleHighValueCustomers(req, res, cleanPath);
+    }
 
     return res.status(404).json({ error: 'Endpoint not found' });
   } catch (error) {
