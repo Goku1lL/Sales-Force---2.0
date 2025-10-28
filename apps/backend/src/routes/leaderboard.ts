@@ -354,17 +354,58 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       employeeId, employeeId
     );
 
+    // Group by metric and calculate totals properly
+    const dailyMetricGroups = dailyAchievements.reduce((groups: Record<string, any>, item) => {
+      const metric = item.metric;
+      if (!groups[metric]) {
+        groups[metric] = {
+          achievement: 0,
+          target: 0,
+          earnings: 0
+        };
+      }
+      
+      // Sum achievements (they're raw numbers, not slab-specific)
+      groups[metric].achievement += Number(item.Achievement || 0);
+      groups[metric].earnings += Number(item.achievement_earnings || 0);
+      
+      // Use highest target (highest slab)
+      groups[metric].target = Math.max(groups[metric].target, Number(item.target || 0));
+      
+      return groups;
+    }, {});
+
+    const weeklyMetricGroups = weeklyAchievements.reduce((groups: Record<string, any>, item) => {
+      const metric = item.metric;
+      if (!groups[metric]) {
+        groups[metric] = {
+          achievement: 0,
+          target: 0,
+          earnings: 0
+        };
+      }
+      
+      // Sum achievements (they're raw numbers, not slab-specific)
+      groups[metric].achievement += Number(item.Achievement || 0);
+      groups[metric].earnings += Number(item.achievement_earnings || 0);
+      
+      // Use highest target (highest slab)
+      groups[metric].target = Math.max(groups[metric].target, Number(item.target || 0));
+      
+      return groups;
+    }, {});
+
     // Calculate totals
     const dailyTotal = {
-      achievement: dailyAchievements.reduce((sum, item) => sum + Number(item.Achievement || 0), 0),
-      target: dailyAchievements.reduce((sum, item) => sum + Number(item.target || 0), 0),
-      earnings: dailyAchievements.reduce((sum, item) => sum + Number(item.achievement_earnings || 0), 0)
+      achievement: Object.values(dailyMetricGroups).reduce((sum: number, group: any) => sum + group.achievement, 0),
+      target: Object.values(dailyMetricGroups).reduce((sum: number, group: any) => sum + group.target, 0),
+      earnings: Object.values(dailyMetricGroups).reduce((sum: number, group: any) => sum + group.earnings, 0)
     };
 
     const weeklyTotal = {
-      achievement: weeklyAchievements.reduce((sum, item) => sum + Number(item.Achievement || 0), 0),
-      target: weeklyAchievements.reduce((sum, item) => sum + Number(item.target || 0), 0),
-      earnings: weeklyAchievements.reduce((sum, item) => sum + Number(item.achievement_earnings || 0), 0)
+      achievement: Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.achievement, 0),
+      target: Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.target, 0),
+      earnings: Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.earnings, 0)
     };
 
     res.json({
