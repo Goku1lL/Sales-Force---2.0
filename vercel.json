@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npx prisma generate && pnpm install && pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
-  "outputDirectory": "apps/frontend/dist",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/[...slug]" }
-  ]
+  "buildCommand": "pnpm install && pnpm --filter @sfa/shared build && pnpm --filter @sfa/frontend build",
+  "outputDirectory": "apps/frontend/dist"
 }
