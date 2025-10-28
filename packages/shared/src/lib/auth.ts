@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
-import type { VercelRequest } from '@vercel/node';
+import type { IncomingMessage } from 'http';
 
-export function verifyToken(req: VercelRequest): { sub: string; role: string } | null {
+export function verifyToken(req: IncomingMessage): { sub: string; role: string } | null {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return null;
 

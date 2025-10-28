@@ -1,14 +1,17 @@
-import type { VercelResponse } from '@vercel/node';
+import type { ServerResponse } from 'http';
 
-export function unauthorized(res: VercelResponse) {
-  return res.status(401).json({ error: 'Unauthorized' });
+export function unauthorized(res: ServerResponse) {
+  res.writeHead(401, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Unauthorized' }));
 }
 
-export function badRequest(res: VercelResponse, message: string) {
-  return res.status(400).json({ error: message });
+export function badRequest(res: ServerResponse, message: string) {
+  res.writeHead(400, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: message }));
 }
 
-export function serverError(res: VercelResponse, error: unknown) {
+export function serverError(res: ServerResponse, error: unknown) {
   console.error('Server error:', error);
-  return res.status(500).json({ error: 'Internal server error' });
+  res.writeHead(500, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Internal server error' }));
 }
