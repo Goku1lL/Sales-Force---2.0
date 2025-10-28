@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { PrismaClient } from '@prisma/client';
+import PrismaClient from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -9,7 +9,7 @@ export default async function handler(
 ) {
   if (req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' })));
+    res.end(JSON.stringify({ error: 'Method not allowed' )));
     return;
   }
 
@@ -18,7 +18,7 @@ export default async function handler(
     
     if (!employeeId || typeof employeeId !== 'string') {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'employeeId is required' })));
+      res.end(JSON.stringify({ error: 'employeeId is required' )));
       return;
     }
 
@@ -102,10 +102,10 @@ export default async function handler(
     };
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ data: summary })));
+    res.end(JSON.stringify({ data: summary )));
   } catch (error) {
     console.error('Dashboard summary error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' })));
+    res.end(JSON.stringify({ error: 'Internal server error' )));
   }
 }

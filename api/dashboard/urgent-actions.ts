@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { PrismaClient } from '@prisma/client';
+import PrismaClient from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -46,9 +46,11 @@ export default async function handler(
       employeeId
     );
 
-    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: urgentActions });
+    res.writeHead(200, { 'Content-Type': 'application/json' );
+    res.end(JSON.stringify({ data: urgentActions });
   } catch (error) {
     console.error('Urgent actions error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Internal server error' });
+    res.writeHead(500, { 'Content-Type': 'application/json' );
+    res.end(JSON.stringify({ error: 'Internal server error' });
   }
 }

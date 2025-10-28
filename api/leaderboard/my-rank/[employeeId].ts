@@ -1,18 +1,20 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { PrismaClient } from '@prisma/client';
+import PrismaClient from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export default async function handler(req: IncomingMessage req: VercelRequest, res: VercelResponse { query: Record<string, string | string[]> }, res: ServerResponse) {
   if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' );
+    res.end(JSON.stringify({ error: 'Method not allowed' });
   }
 
   try {
     const { employeeId } = req.query;
     
     if (!employeeId || typeof employeeId !== 'string') {
-      res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'employeeId is required' });
+      res.writeHead(400, { 'Content-Type': 'application/json' );
+    res.end(JSON.stringify({ error: 'employeeId is required' });
     }
 
     // Get employee's rank in cluster and city
@@ -80,9 +82,11 @@ export default async function handler(req: IncomingMessage req: VercelRequest, r
       achievement_percentage: clusterRank[0]?.achievement_percentage || 0,
     };
 
-    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: response });
+    res.writeHead(200, { 'Content-Type': 'application/json' );
+    res.end(JSON.stringify({ data: response });
   } catch (error) {
     console.error('My rank error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Internal server error' });
+    res.writeHead(500, { 'Content-Type': 'application/json' );
+    res.end(JSON.stringify({ error: 'Internal server error' });
   }
 }

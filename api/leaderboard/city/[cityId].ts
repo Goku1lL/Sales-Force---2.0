@@ -1,22 +1,31 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { PrismaClient } from '@prisma/client';
+import PrismaClient from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: IncomingMessage req: VercelRequest, res: VercelResponse { query: Record<string, string | string[]> }, res: ServerResponse) {
+export default async function handler(
+  req: IncomingMessage & { query: Record<string, string | string[]> },
+  res: ServerResponse
+) {
   if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
     const { cityId, period } = req.query;
     
     if (!cityId || typeof cityId !== 'string') {
-      res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'cityId is required' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'cityId is required' }));
+      return;
     }
 
     if (!period || typeof period !== 'string' || !['day', 'week'].includes(period)) {
-      res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'period must be day or week' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'period must be day or week' }));
+      return;
     }
 
     let query = '';
@@ -62,9 +71,11 @@ export default async function handler(req: IncomingMessage req: VercelRequest, r
 
     const leaderboard = await prisma.$queryRawUnsafe<any[]>(query, parseInt(cityId));
 
-    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: leaderboard });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ data: leaderboard }));
   } catch (error) {
     console.error('City leaderboard error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Internal server error' });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
   }
 }
