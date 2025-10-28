@@ -23,6 +23,7 @@ router.get('/summary', async (req, res, next) => {
        LEFT JOIN DayAchievement da ON dt.employee_id = da.employee_id
          AND dt.date = da.date
          AND dt.metric = da.metric
+         AND dt.slab_Segment = da.slab_Segment
          AND da.deleted = 0
        WHERE dt.employee_id = ? AND dt.date = ? AND dt.deleted = 0`,
       employeeId, today
@@ -55,6 +56,7 @@ router.get('/summary', async (req, res, next) => {
        LEFT JOIN WeekAchievement wa ON wt.employee_id = wa.employee_id
          AND wt.yearweek = wa.yearweek
          AND wt.metric = wa.metric
+         AND wt.slab_Segment = wa.slab_Segment
          AND wa.deleted = 0
        WHERE wt.employee_id = ? AND wt.yearweek = (
          SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
