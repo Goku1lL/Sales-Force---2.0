@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "cd apps/backend && npm install && npm run build",
+    "build": "npm install && cd apps/backend && npm run build",
     "start": "cd apps/backend && npm start",
     "lint": "echo \"No lint at root\""
   },
