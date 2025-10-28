@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+const PrismaClient = require('@prisma/client').default;
 
 const prisma = new PrismaClient({
   datasources: {
