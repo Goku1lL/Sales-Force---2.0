@@ -16,25 +16,9 @@ import { rateLimit } from './middleware/rateLimit';
 const app = express();
 
 app.use(helmet());
+// Temporary: Allow all origins to test
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-
-    const allowedOrigins = [
-      'https://sales-force-2-0-frontend.vercel.app',
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      process.env.FRONTEND_URL
-    ].filter(Boolean); // Remove undefined values
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Allow all origins
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
