@@ -14,7 +14,8 @@
       "Bash(vercel link:*)",
       "Bash(vercel dev:*)",
       "Bash(curl:*)",
-      "Bash(vercel logs:*)"
+      "Bash(vercel logs:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

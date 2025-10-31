@@ -464,6 +464,87 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       group.earnings = earned;
     });
 
+    // Query rank-based bonus data from SA_EmployeeBonus table for weekly metrics
+    const currentYearweekResult = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT MAX(yearweek) as yearweek FROM WeekTargets WHERE employee_id = ? AND deleted = 0`,
+      employeeId
+    );
+    const currentYearweek = currentYearweekResult[0]?.yearweek;
+
+    let weeklyBonusMap: Record<string, any> = {};
+    let weeklyBonusTiersMap: Record<string, any[]> = {};
+    
+    if (currentYearweek) {
+      const bonusData = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT metric, rank, bonus_achievement
+         FROM SA_EmployeeBonus
+         WHERE employee_id = ? 
+           AND steps = 'week'
+           AND steps_value = ?
+           AND deleted = 0`,
+        employeeId,
+        currentYearweek
+      );
+
+      // Create bonus lookup map by metric
+      weeklyBonusMap = bonusData.reduce((map: Record<string, any>, item) => {
+        map[item.metric] = {
+          rank: Number(item.rank),
+          bonusAmount: Number(item.bonus_achievement || 0)
+        };
+        return map;
+      }, {});
+
+      // Query bonus tier configuration for all weekly metrics
+      const weeklyMetricsList = Object.keys(weeklyMetricGroups);
+      if (weeklyMetricsList.length > 0) {
+        const placeholders = weeklyMetricsList.map(() => '?').join(',');
+        const bonusTiersData = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT metric, start_rank, end_rank, bonus_percent, target
+           FROM SA_Bonus
+           WHERE metric IN (${placeholders}) AND steps = 'week' AND deleted = 0
+           ORDER BY metric, start_rank`,
+          ...weeklyMetricsList
+        );
+
+        // Group tiers by metric
+        weeklyBonusTiersMap = bonusTiersData.reduce((map: Record<string, any[]>, item) => {
+          if (!map[item.metric]) {
+            map[item.metric] = [];
+          }
+          map[item.metric].push({
+            startRank: Number(item.start_rank),
+            endRank: Number(item.end_rank),
+            bonusPercent: Number(item.bonus_percent),
+            multiplier: Number(item.bonus_percent), // 2 = 200%, 1.5 = 150%, 1 = 100%
+            target: Number(item.target || 0)
+          });
+          return map;
+        }, {});
+      }
+    }
+
+    // Merge bonus data with weekly metric groups
+    Object.keys(weeklyMetricGroups).forEach(metricName => {
+      const group = weeklyMetricGroups[metricName];
+      const bonus = weeklyBonusMap[metricName];
+      const bonusTiers = weeklyBonusTiersMap[metricName] || [];
+      
+      if (bonus) {
+        // Add bonus to earnings
+        group.earnings = group.earnings + bonus.bonusAmount;
+        group.rankBonus = {
+          rank: bonus.rank,
+          bonusAmount: bonus.bonusAmount
+        };
+      }
+      
+      // Add bonus tier configuration for motivational display
+      if (bonusTiers.length > 0) {
+        group.bonusTiers = bonusTiers;
+      }
+    });
+
     // Calculate totals
     const dailyTotal = {
       achievement: Object.values(dailyMetricGroups).reduce((sum: number, group: any) => sum + group.achievement, 0),
@@ -471,6 +552,7 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       earnings: Object.values(dailyMetricGroups).reduce((sum: number, group: any) => sum + group.earnings, 0)
     };
 
+    // Calculate weekly totals (earnings already includes bonus from merge above)
     const weeklyTotal = {
       achievement: Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.achievement, 0),
       target: Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.target, 0),
@@ -511,6 +593,8 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
           metrics: weeklyTargets.map(target => {
             const achievement = weeklyAchievementMap[target.metric];
             const metricGroup = weeklyMetricGroups[target.metric];
+            const bonus = weeklyBonusMap[target.metric];
+            const bonusTiers = weeklyBonusTiersMap[target.metric] || [];
             return {
               metric: target.metric,
               slab_Segment: target.slab_Segment,
@@ -519,7 +603,16 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
               earnings: metricGroup?.earnings || 0,
               contribution: Number(target.contribution || 0),
               incentive_percent: Number(target.incentive_percent || 0),
-              achievement_percentage: target.target > 0 ? ((achievement?.achievement || 0) / target.target * 100) : 0
+              achievement_percentage: target.target > 0 ? ((achievement?.achievement || 0) / target.target * 100) : 0,
+              ...(bonus && {
+                rankBonus: {
+                  rank: bonus.rank,
+                  bonusAmount: bonus.bonusAmount
+                }
+              }),
+              ...(bonusTiers.length > 0 && {
+                bonusTiers: bonusTiers
+              })
             };
           }),
           totals: weeklyTotal,

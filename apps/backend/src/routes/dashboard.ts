@@ -204,6 +204,87 @@ router.get('/summary', async (req, res, next) => {
       group.totalEarnings = earned;
     });
 
+    // Query rank-based bonus data from SA_EmployeeBonus table
+    const currentYearweekResult = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT MAX(yearweek) as yearweek FROM WeekTargets WHERE employee_id = ? AND deleted = 0`,
+      employeeId
+    );
+    const currentYearweek = currentYearweekResult[0]?.yearweek;
+
+    let bonusMap: Record<string, any> = {};
+    let bonusTiersMap: Record<string, any[]> = {};
+    
+    if (currentYearweek) {
+      const bonusData = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT metric, rank, bonus_achievement
+         FROM SA_EmployeeBonus
+         WHERE employee_id = ? 
+           AND steps = 'week'
+           AND steps_value = ?
+           AND deleted = 0`,
+        employeeId,
+        currentYearweek
+      );
+
+      // Create bonus lookup map by metric
+      bonusMap = bonusData.reduce((map: Record<string, any>, item) => {
+        map[item.metric] = {
+          rank: Number(item.rank),
+          bonusAmount: Number(item.bonus_achievement || 0)
+        };
+        return map;
+      }, {});
+
+      // Query bonus tier configuration for all metrics in weeklyMetricGroups
+      const metricsList = Object.keys(weeklyMetricGroups);
+      if (metricsList.length > 0) {
+        const placeholders = metricsList.map(() => '?').join(',');
+        const bonusTiersData = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT metric, start_rank, end_rank, bonus_percent, target
+           FROM SA_Bonus
+           WHERE metric IN (${placeholders}) AND steps = 'week' AND deleted = 0
+           ORDER BY metric, start_rank`,
+          ...metricsList
+        );
+
+        // Group tiers by metric
+        bonusTiersMap = bonusTiersData.reduce((map: Record<string, any[]>, item) => {
+          if (!map[item.metric]) {
+            map[item.metric] = [];
+          }
+          map[item.metric].push({
+            startRank: Number(item.start_rank),
+            endRank: Number(item.end_rank),
+            bonusPercent: Number(item.bonus_percent),
+            multiplier: Number(item.bonus_percent), // 2 = 200%, 1.5 = 150%, 1 = 100%
+            target: Number(item.target || 0)
+          });
+          return map;
+        }, {});
+      }
+    }
+
+    // Merge bonus data with weekly metric groups
+    Object.keys(weeklyMetricGroups).forEach(metricName => {
+      const group = weeklyMetricGroups[metricName];
+      const bonus = bonusMap[metricName];
+      const bonusTiers = bonusTiersMap[metricName] || [];
+      
+      if (bonus) {
+        // Add bonus to total earnings
+        group.totalEarnings = group.totalEarnings + bonus.bonusAmount;
+        group.rankBonus = {
+          rank: bonus.rank,
+          bonusAmount: bonus.bonusAmount
+        };
+      }
+      
+      // Add bonus tier configuration for motivational display
+      if (bonusTiers.length > 0) {
+        group.bonusTiers = bonusTiers;
+      }
+    });
+
     // Calculate total achievements and targets across all metrics
     const weeklyAchievement = Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.totalAchievement, 0);
     const weeklyTargetUnits = Object.values(weeklyMetricGroups).reduce((sum: number, group: any) => sum + group.totalTarget, 0);

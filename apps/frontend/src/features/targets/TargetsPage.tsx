@@ -72,6 +72,23 @@ export default function TargetsPage() {
       maxTarget: number;
       contribution: number;
       pendingToEarn: number;
+      rankBonus?: {
+        rank: number;
+        bonusAmount: number;
+      };
+      bonusTiers?: Array<{
+        startRank: number;
+        endRank: number;
+        bonusPercent: number;
+        multiplier: number;
+        target: number;
+      }>;
+      maxPotentialBreakdown?: {
+        base: number;
+        bonus: number;
+        multiplier: number;
+        total: number;
+      };
     }> = {};
 
     // Process non-AB metrics
@@ -129,6 +146,18 @@ export default function TargetsPage() {
       // For achievements, only take the first occurrence (avoid duplication)
       if (metricSummaries[metricName].totalAchievement === 0) {
         metricSummaries[metricName].totalAchievement = Number(item.achievement || 0);
+      }
+      
+      // Capture rank bonus if available
+      if (item.rankBonus && !metricSummaries[metricName].rankBonus) {
+        metricSummaries[metricName].rankBonus = {
+          rank: Number(item.rankBonus.rank),
+          bonusAmount: Number(item.rankBonus.bonusAmount || 0)
+        };
+      }
+      // Capture bonus tiers if available
+      if (item.bonusTiers && !metricSummaries[metricName].bonusTiers) {
+        metricSummaries[metricName].bonusTiers = item.bonusTiers;
       }
       
       metricSummaries[metricName].maxTarget = Math.max(
@@ -194,15 +223,57 @@ export default function TargetsPage() {
         metricSummaries[metricName].totalAchievement = Number(item.achievement || 0);
       }
       
+      // Capture rank bonus if available
+      if (item.rankBonus && !metricSummaries[metricName].rankBonus) {
+        metricSummaries[metricName].rankBonus = {
+          rank: Number(item.rankBonus.rank),
+          bonusAmount: Number(item.rankBonus.bonusAmount || 0)
+        };
+      }
+      // Capture bonus tiers if available
+      if (item.bonusTiers && !metricSummaries[metricName].bonusTiers) {
+        metricSummaries[metricName].bonusTiers = item.bonusTiers;
+      }
+      
       metricSummaries[metricName].maxTarget = Math.max(
         metricSummaries[metricName].maxTarget,
         Number(item.target || 0)
       );
     });
 
-    // Calculate pending to earn for each metric
+    // Calculate max potential and pending to earn for each metric (including bonus multipliers)
     Object.keys(metricSummaries).forEach(metricName => {
       const summary = metricSummaries[metricName];
+      
+      // Base max potential (from slabs)
+      const baseMaxPotential = summary.maxPotentialEarnings;
+      
+      // If bonus tiers exist, calculate max potential including highest bonus multiplier
+      if (summary.bonusTiers && summary.bonusTiers.length > 0) {
+        // Get highest bonus multiplier (typically the first tier, rank 1-5 = 200% = 2.0)
+        // Bonus tiers are ordered by start_rank (ascending), so first tier has highest multiplier
+        const highestBonusMultiplier = summary.bonusTiers[0]?.multiplier || 1;
+        
+        // Max potential = Base earnings at highest slab × Highest bonus multiplier
+        summary.maxPotentialEarnings = baseMaxPotential * highestBonusMultiplier;
+        
+        // Store breakdown for display
+        summary.maxPotentialBreakdown = {
+          base: baseMaxPotential,
+          bonus: baseMaxPotential * (highestBonusMultiplier - 1), // Bonus amount only
+          multiplier: highestBonusMultiplier,
+          total: summary.maxPotentialEarnings
+        };
+      } else {
+        summary.maxPotentialBreakdown = {
+          base: baseMaxPotential,
+          bonus: 0,
+          multiplier: 1,
+          total: baseMaxPotential
+        };
+      }
+      
+      // Pending = Max possible (with bonus) - Already earned (base + current bonus)
       summary.pendingToEarn = Math.max(0, summary.maxPotentialEarnings - summary.totalEarnings);
     });
 
@@ -246,10 +317,15 @@ export default function TargetsPage() {
           </div>
 
           {/* Quick Stats */}
-          <div className="flex justify-center gap-6 mt-3 text-sm">
+          <div className="flex justify-center gap-4 mt-3 text-xs sm:text-sm flex-wrap">
             <div>
               <span className="text-gray-500">Max Potential:</span>
               <span className="ml-1 font-semibold">{formatCurrency(totalMaxPotential)}</span>
+              {summaryList.some(m => m.maxPotentialBreakdown && m.maxPotentialBreakdown.bonus > 0) && (
+                <div className="text-xs text-gray-400 mt-0.5">
+                  (Includes bonus)
+                </div>
+              )}
             </div>
             <div>
               <span className="text-gray-500">Earned:</span>
@@ -260,6 +336,19 @@ export default function TargetsPage() {
               <span className="ml-1 font-semibold text-orange-600">{formatCurrency(totalPending)}</span>
             </div>
           </div>
+          
+          {/* Max Potential Breakdown (if bonus included) */}
+          {summaryList.some(m => m.maxPotentialBreakdown && m.maxPotentialBreakdown.bonus > 0) && (
+            <div className={`mt-3 p-2 rounded-lg text-xs ${
+              currentTheme.isDark 
+                ? 'bg-purple-500/10 border border-purple-500/20' 
+                : 'bg-purple-50 border border-purple-200'
+            }`}>
+              <div className="text-center text-gray-600">
+                <span>💰 Max Potential includes highest bonus tier (e.g., {(summaryList.find(m => m.maxPotentialBreakdown && m.maxPotentialBreakdown.multiplier > 1)?.maxPotentialBreakdown?.multiplier || 2) * 100}% for Rank 1-5)</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Metrics Summary Separator */}
@@ -313,6 +402,178 @@ export default function TargetsPage() {
                   {(summary.contribution * 100).toFixed(0)}% contribution
                 </span>
               </div>
+
+              {/* Rank Bonus Display */}
+              {summary.rankBonus && (
+                <div className={`mb-4 p-3 rounded-lg border ${
+                  currentTheme.isDark 
+                    ? 'bg-yellow-500/10 border-yellow-500/30' 
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-bold ${
+                        currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                      }`}>
+                        🏆 Rank {summary.rankBonus.rank}
+                        {summary.rankBonus.rank <= 5 && ' 🎯'}
+                      </span>
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        summary.rankBonus.rank <= 5 
+                          ? currentTheme.isDark 
+                            ? 'bg-yellow-500/20 text-yellow-400' 
+                            : 'bg-yellow-100 text-yellow-800'
+                          : summary.rankBonus.rank <= 10
+                          ? currentTheme.isDark 
+                            ? 'bg-orange-500/20 text-orange-400' 
+                            : 'bg-orange-100 text-orange-800'
+                          : currentTheme.isDark 
+                            ? 'bg-blue-500/20 text-blue-400' 
+                            : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {summary.rankBonus.rank <= 5 ? 'Top 5' : 
+                         summary.rankBonus.rank <= 10 ? 'Top 10' : 'Top 15'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Bonus:</span>
+                      <span className={`ml-1 font-semibold ${
+                        currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                      }`}>
+                        +{formatCurrency(summary.rankBonus.bonusAmount)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500">
+                    <span>Base: {formatCurrency(summary.totalEarnings - summary.rankBonus.bonusAmount)}</span>
+                    <span className="mx-2">+</span>
+                    <span>Bonus: {formatCurrency(summary.rankBonus.bonusAmount)}</span>
+                    <span className="mx-2">=</span>
+                    <span className="font-semibold text-green-600">Total: {formatCurrency(summary.totalEarnings)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Bonus Tier Visualization - Motivational Display */}
+              {summary.bonusTiers && summary.bonusTiers.length > 0 && (
+                <div className={`mb-4 p-4 rounded-lg border ${
+                  currentTheme.isDark 
+                    ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30' 
+                    : 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
+                }`}>
+                  <div className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                    <span>🏆</span>
+                    <span>Bonus Tiers Available</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {summary.bonusTiers.map((tier, idx) => {
+                      const isCurrentTier = summary.rankBonus && 
+                        summary.rankBonus.rank >= tier.startRank && 
+                        summary.rankBonus.rank <= tier.endRank;
+                      const isAchieved = summary.rankBonus && summary.rankBonus.rank <= tier.endRank;
+                      const nextTierIndex = summary.bonusTiers!.findIndex(t => 
+                        summary.rankBonus && summary.rankBonus.rank >= t.startRank && summary.rankBonus.rank <= t.endRank
+                      );
+                      const isNextTier = !summary.rankBonus && idx === 0 || 
+                        (summary.rankBonus && summary.rankBonus.rank > tier.endRank && idx === (nextTierIndex >= 0 ? nextTierIndex + 1 : 0));
+                      
+                      return (
+                        <div 
+                          key={idx}
+                          className={`p-3 rounded-lg border-2 ${
+                            isCurrentTier
+                              ? currentTheme.isDark
+                                ? 'bg-yellow-500/20 border-yellow-500/50 shadow-lg'
+                                : 'bg-yellow-100 border-yellow-300 shadow-lg'
+                              : isAchieved
+                              ? currentTheme.isDark
+                                ? 'bg-green-500/10 border-green-500/30'
+                                : 'bg-green-50 border-green-200'
+                              : currentTheme.isDark
+                              ? 'bg-gray-700/50 border-gray-600'
+                              : 'bg-gray-100 border-gray-300'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className={`text-lg font-bold mb-1 ${
+                              isCurrentTier 
+                                ? currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                                : isAchieved
+                                ? currentTheme.isDark ? 'text-green-400' : 'text-green-700'
+                                : currentTheme.isDark ? 'text-gray-500' : 'text-gray-400'
+                            }`}>
+                              Rank {tier.startRank}-{tier.endRank}
+                            </div>
+                            <div className={`text-2xl font-bold mb-1 ${
+                              isCurrentTier || isAchieved
+                                ? currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                                : currentTheme.isDark ? 'text-gray-500' : 'text-gray-400'
+                            }`}>
+                              {(tier.bonusPercent * 100).toFixed(0)}%
+                            </div>
+                            <div className="text-xs text-gray-600 mb-2">Bonus Multiplier</div>
+                            {isCurrentTier && (
+                              <div className="text-xs font-semibold text-yellow-600 animate-pulse">
+                                ⭐ You're Here!
+                              </div>
+                            )}
+                            {isAchieved && !isCurrentTier && (
+                              <div className="text-xs font-semibold text-green-600">
+                                ✓ Achieved
+                              </div>
+                            )}
+                            {isNextTier && !isCurrentTier && (
+                              <div className="text-xs font-semibold text-blue-600">
+                                🎯 Next Goal!
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {summary.rankBonus && summary.rankBonus.rank > 15 && (
+                    <div className="mt-3 text-sm text-center text-gray-600 font-semibold">
+                      You're ranked #{summary.rankBonus.rank} - Keep pushing for higher tiers! 💪
+                    </div>
+                  )}
+                  
+                  {/* Motivational Message */}
+                  {(() => {
+                    let motivationalMessage = '';
+                    
+                    if (summary.rankBonus) {
+                      const currentTier = summary.bonusTiers!.find(t => 
+                        summary.rankBonus!.rank >= t.startRank && summary.rankBonus!.rank <= t.endRank
+                      );
+                      const currentTierIdx = currentTier ? summary.bonusTiers!.indexOf(currentTier) : -1;
+                      if (currentTierIdx > 0) {
+                        const nextTier = summary.bonusTiers![currentTierIdx - 1];
+                        const rankGap = nextTier.startRank - summary.rankBonus.rank;
+                        motivationalMessage = `🎯 Only ${rankGap} rank${rankGap > 1 ? 's' : ''} away from Rank ${nextTier.startRank}-${nextTier.endRank} bonus!`;
+                      }
+                    } else {
+                      const slab3Target = summary.bonusTiers![0]?.target || 0;
+                      const unitsNeeded = Math.max(0, slab3Target - summary.totalAchievement);
+                      if (unitsNeeded > 0) {
+                        motivationalMessage = `🚀 Reach ${slab3Target} units to unlock bonus tiers! ${unitsNeeded} more needed.`;
+                      }
+                    }
+                    
+                    return motivationalMessage ? (
+                      <div className={`mt-3 p-3 rounded-lg ${
+                        currentTheme.isDark 
+                          ? 'bg-blue-500/20 border border-blue-500/30' 
+                          : 'bg-blue-50 border border-blue-200'
+                      }`}>
+                        <div className="text-sm font-semibold text-center">
+                          {motivationalMessage}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
 
               {/* Slab Badges Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
