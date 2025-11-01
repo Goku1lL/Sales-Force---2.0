@@ -361,294 +361,448 @@ export default function TargetsPage() {
         </div>
 
         {/* Metric Sections with Slab Badges */}
-        <div className="space-y-6">
-          {summaryList.map((summary) => (
-            <div key={summary.metric} className="space-y-4">
-              {/* Metric Separator */}
-              <div className="flex items-center justify-center">
-                <div className="flex-1 border-t-2 border-gray-400"></div>
-                <h4 className="text-base font-bold text-gray-800 uppercase tracking-wide px-4">
-                  {summary.metric}
-                </h4>
-                <div className="flex-1 border-t-2 border-gray-400"></div>
-              </div>
-
-              {/* Metric Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">
-                    {getMetricEmoji(summary.metric)}
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xl">{summary.metric}</span>
-                      {/* Weekly badge for AB metrics in Day view */}
-                      {summary.metric.includes('AB') && viewMode === 'day' && (
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                          currentTheme.isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
+        {(() => {
+          // Check if all metrics have empty/null slab_Segment or single slab
+          // Empty slab_Segment means the slab details are essentially empty
+          const hasEmptyOrSingleSlabs = summaryList.every(summary => {
+            if (!summary.slabs || summary.slabs.length === 0) return true;
+            // Check if all slabs have empty/null slab_Segment
+            const allEmptySlabs = summary.slabs.every(slab => !slab.slab_Segment || slab.slab_Segment.trim() === '');
+            // Or if there's only one slab
+            return allEmptySlabs || summary.slabs.length <= 1;
+          });
+          
+          // If all metrics have empty or single slab, display as grid cards
+          if (hasEmptyOrSingleSlabs) {
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {summaryList.map((summary) => {
+                  const slab = summary.slabs && summary.slabs.length > 0 ? summary.slabs[0] : null;
+                  
+                  return (
+                    <div 
+                      key={summary.metric} 
+                      className={`p-6 rounded-lg border-2 space-y-4 ${
+                        currentTheme.isDark 
+                          ? 'bg-gray-800/50 border-gray-700' 
+                          : 'bg-white border-gray-200 shadow-md'
+                      }`}
+                    >
+                      {/* Metric Header */}
+                      <div className="text-center space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-3xl">{getMetricEmoji(summary.metric)}</span>
+                          <h4 className="text-base font-bold text-gray-800 uppercase tracking-wide">
+                            {summary.metric}
+                          </h4>
+                          {summary.metric.includes('AB') && viewMode === 'day' && (
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              currentTheme.isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              Weekly
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-block ${
+                          currentTheme.isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
                         }`}>
-                          Weekly
+                          {(summary.contribution * 100).toFixed(0)}% contribution
                         </span>
+                      </div>
+
+                      {/* Target & Achievement Summary */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600">Target:</span>
+                          <span className="font-bold">{summary.maxTarget.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600">Achieved:</span>
+                          <span className="font-bold">{summary.totalAchievement.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${getProgressBarColor(
+                                summary.maxTarget > 0 ? (summary.totalAchievement / summary.maxTarget) * 100 : 0
+                              )}`}
+                              style={{ width: `${Math.min((summary.maxTarget > 0 ? (summary.totalAchievement / summary.maxTarget) * 100 : 0), 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs font-medium w-12 text-right">
+                            {summary.maxTarget > 0 ? ((summary.totalAchievement / summary.maxTarget) * 100).toFixed(1) : 0}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Slab Details (if exists) */}
+                      {slab && (
+                        <div className={`p-3 rounded-lg border ${
+                          currentTheme.isDark
+                            ? 'border-blue-500 bg-blue-500/10'
+                            : 'border-blue-400 bg-blue-50'
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{getSlabEmoji(slab.slab_Segment)}</span>
+                              <span className="font-bold text-xs uppercase">{slab.slab_Segment || 'Slab'}</span>
+                            </div>
+                            <span className="text-xs font-bold px-2 py-1 rounded bg-green-500 text-white">
+                              ACTIVE ⚡
+                            </span>
+                          </div>
+                          <div className="text-center mb-2">
+                            <div className="text-sm font-bold">
+                              {slab.achievement.toLocaleString()} / {slab.target.toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-xs border-t border-gray-300 pt-2 mt-2">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Earned:</span>
+                              <span className="font-semibold text-green-600">{formatCurrency(slab.earnings)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Pending:</span>
+                              <span className="font-semibold text-orange-600">{formatCurrency(slab.pendingToEarn)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-200">
+                              <span>{(slab.incentivePercent * 100).toFixed(0)}% incentive</span>
+                              <span>Max: {formatCurrency(slab.potentialEarnings)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Summary Info (if no slab) */}
+                      {!slab && (
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Earned:</span>
+                            <span className="font-semibold text-green-600">{formatCurrency(summary.totalEarnings)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Pending:</span>
+                            <span className="font-semibold text-orange-600">{formatCurrency(summary.pendingToEarn)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Max Potential:</span>
+                            <span className="font-semibold text-blue-600">{formatCurrency(summary.maxPotentialEarnings)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Rank Bonus (compact) */}
+                      {summary.rankBonus && (
+                        <div className={`p-2 rounded border text-xs ${
+                          currentTheme.isDark 
+                            ? 'bg-yellow-500/10 border-yellow-500/30' 
+                            : 'bg-yellow-50 border-yellow-200'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold">🏆 Rank {summary.rankBonus.rank}</span>
+                            <span className="text-yellow-700 font-bold">+{formatCurrency(summary.rankBonus.bonusAmount)}</span>
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="text-sm text-gray-600">
-                      💵 Pending: <span className="font-semibold text-orange-600">{formatCurrency(summary.pendingToEarn)}</span>
-                    </div>
-                  </div>
-                </div>
-                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap ${
-                  currentTheme.isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
-                }`}>
-                  {(summary.contribution * 100).toFixed(0)}% contribution
-                </span>
+                  );
+                })}
               </div>
+            );
+          }
+          
+          // Otherwise, use vertical layout (existing behavior)
+          return (
+            <div className="space-y-6">
+              {summaryList.map((summary) => (
+                <div key={summary.metric} className="space-y-4">
+                  {/* Metric Separator */}
+                  <div className="flex items-center justify-center">
+                    <div className="flex-1 border-t-2 border-gray-400"></div>
+                    <h4 className="text-base font-bold text-gray-800 uppercase tracking-wide px-4">
+                      {summary.metric}
+                    </h4>
+                    <div className="flex-1 border-t-2 border-gray-400"></div>
+                  </div>
 
-              {/* Rank Bonus Display */}
-              {summary.rankBonus && (
-                <div className={`mb-4 p-3 rounded-lg border ${
-                  currentTheme.isDark 
-                    ? 'bg-yellow-500/10 border-yellow-500/30' 
-                    : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-bold ${
-                        currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
-                      }`}>
-                        🏆 Rank {summary.rankBonus.rank}
-                        {summary.rankBonus.rank <= 5 && ' 🎯'}
+                  {/* Metric Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">
+                        {getMetricEmoji(summary.metric)}
                       </span>
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        summary.rankBonus.rank <= 5 
-                          ? currentTheme.isDark 
-                            ? 'bg-yellow-500/20 text-yellow-400' 
-                            : 'bg-yellow-100 text-yellow-800'
-                          : summary.rankBonus.rank <= 10
-                          ? currentTheme.isDark 
-                            ? 'bg-orange-500/20 text-orange-400' 
-                            : 'bg-orange-100 text-orange-800'
-                          : currentTheme.isDark 
-                            ? 'bg-blue-500/20 text-blue-400' 
-                            : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {summary.rankBonus.rank <= 5 ? 'Top 5' : 
-                         summary.rankBonus.rank <= 10 ? 'Top 10' : 'Top 15'}
-                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xl">{summary.metric}</span>
+                          {/* Weekly badge for AB metrics in Day view */}
+                          {summary.metric.includes('AB') && viewMode === 'day' && (
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              currentTheme.isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              Weekly
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          💵 Pending: <span className="font-semibold text-orange-600">{formatCurrency(summary.pendingToEarn)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">Bonus:</span>
-                      <span className={`ml-1 font-semibold ${
-                        currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
-                      }`}>
-                        +{formatCurrency(summary.rankBonus.bonusAmount)}
-                      </span>
-                    </div>
+                    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap ${
+                      currentTheme.isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {(summary.contribution * 100).toFixed(0)}% contribution
+                    </span>
                   </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    <span>Base: {formatCurrency(summary.totalEarnings - summary.rankBonus.bonusAmount)}</span>
-                    <span className="mx-2">+</span>
-                    <span>Bonus: {formatCurrency(summary.rankBonus.bonusAmount)}</span>
-                    <span className="mx-2">=</span>
-                    <span className="font-semibold text-green-600">Total: {formatCurrency(summary.totalEarnings)}</span>
-                  </div>
-                </div>
-              )}
 
-              {/* Bonus Tier Visualization - Motivational Display */}
-              {summary.bonusTiers && summary.bonusTiers.length > 0 && (
-                <div className={`mb-4 p-4 rounded-lg border ${
-                  currentTheme.isDark 
-                    ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30' 
-                    : 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
-                }`}>
-                  <div className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-2">
-                    <span>🏆</span>
-                    <span>Bonus Tiers Available</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {summary.bonusTiers.map((tier, idx) => {
-                      const isCurrentTier = summary.rankBonus && 
-                        summary.rankBonus.rank >= tier.startRank && 
-                        summary.rankBonus.rank <= tier.endRank;
-                      const isAchieved = summary.rankBonus && summary.rankBonus.rank <= tier.endRank;
-                      const nextTierIndex = summary.bonusTiers!.findIndex(t => 
-                        summary.rankBonus && summary.rankBonus.rank >= t.startRank && summary.rankBonus.rank <= t.endRank
-                      );
-                      const isNextTier = !summary.rankBonus && idx === 0 || 
-                        (summary.rankBonus && summary.rankBonus.rank > tier.endRank && idx === (nextTierIndex >= 0 ? nextTierIndex + 1 : 0));
+                  {/* Rank Bonus Display */}
+                  {summary.rankBonus && (
+                    <div className={`mb-4 p-3 rounded-lg border ${
+                      currentTheme.isDark 
+                        ? 'bg-yellow-500/10 border-yellow-500/30' 
+                        : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold ${
+                            currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                          }`}>
+                            🏆 Rank {summary.rankBonus.rank}
+                            {summary.rankBonus.rank <= 5 && ' 🎯'}
+                          </span>
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            summary.rankBonus.rank <= 5 
+                              ? currentTheme.isDark 
+                                ? 'bg-yellow-500/20 text-yellow-400' 
+                                : 'bg-yellow-100 text-yellow-800'
+                              : summary.rankBonus.rank <= 10
+                              ? currentTheme.isDark 
+                                ? 'bg-orange-500/20 text-orange-400' 
+                                : 'bg-orange-100 text-orange-800'
+                              : currentTheme.isDark 
+                                ? 'bg-blue-500/20 text-blue-400' 
+                                : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {summary.rankBonus.rank <= 5 ? 'Top 5' : 
+                             summary.rankBonus.rank <= 10 ? 'Top 10' : 'Top 15'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Bonus:</span>
+                          <span className={`ml-1 font-semibold ${
+                            currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                          }`}>
+                            +{formatCurrency(summary.rankBonus.bonusAmount)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        <span>Base: {formatCurrency(summary.totalEarnings - summary.rankBonus.bonusAmount)}</span>
+                        <span className="mx-2">+</span>
+                        <span>Bonus: {formatCurrency(summary.rankBonus.bonusAmount)}</span>
+                        <span className="mx-2">=</span>
+                        <span className="font-semibold text-green-600">Total: {formatCurrency(summary.totalEarnings)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bonus Tier Visualization - Motivational Display */}
+                  {summary.bonusTiers && summary.bonusTiers.length > 0 && (
+                    <div className={`mb-4 p-4 rounded-lg border ${
+                      currentTheme.isDark 
+                        ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30' 
+                        : 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
+                    }`}>
+                      <div className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                        <span>🏆</span>
+                        <span>Bonus Tiers Available</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {summary.bonusTiers.map((tier, idx) => {
+                          const isCurrentTier = summary.rankBonus && 
+                            summary.rankBonus.rank >= tier.startRank && 
+                            summary.rankBonus.rank <= tier.endRank;
+                          const isAchieved = summary.rankBonus && summary.rankBonus.rank <= tier.endRank;
+                          const nextTierIndex = summary.bonusTiers!.findIndex(t => 
+                            summary.rankBonus && summary.rankBonus.rank >= t.startRank && summary.rankBonus.rank <= t.endRank
+                          );
+                          const isNextTier = !summary.rankBonus && idx === 0 || 
+                            (summary.rankBonus && summary.rankBonus.rank > tier.endRank && idx === (nextTierIndex >= 0 ? nextTierIndex + 1 : 0));
+                          
+                          return (
+                            <div 
+                              key={idx}
+                              className={`p-3 rounded-lg border-2 ${
+                                isCurrentTier
+                                  ? currentTheme.isDark
+                                    ? 'bg-yellow-500/20 border-yellow-500/50 shadow-lg'
+                                    : 'bg-yellow-100 border-yellow-300 shadow-lg'
+                                  : isAchieved
+                                  ? currentTheme.isDark
+                                    ? 'bg-green-500/10 border-green-500/30'
+                                    : 'bg-green-50 border-green-200'
+                                  : currentTheme.isDark
+                                  ? 'bg-gray-700/50 border-gray-600'
+                                  : 'bg-gray-100 border-gray-300'
+                              }`}
+                            >
+                              <div className="text-center">
+                                <div className={`text-lg font-bold mb-1 ${
+                                  isCurrentTier 
+                                    ? currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                                    : isAchieved
+                                    ? currentTheme.isDark ? 'text-green-400' : 'text-green-700'
+                                    : currentTheme.isDark ? 'text-gray-500' : 'text-gray-400'
+                                }`}>
+                                  Rank {tier.startRank}-{tier.endRank}
+                                </div>
+                                <div className={`text-2xl font-bold mb-1 ${
+                                  isCurrentTier || isAchieved
+                                    ? currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
+                                    : currentTheme.isDark ? 'text-gray-500' : 'text-gray-400'
+                                }`}>
+                                  {(tier.bonusPercent * 100).toFixed(0)}%
+                                </div>
+                                <div className="text-xs text-gray-600 mb-2">Bonus Multiplier</div>
+                                {isCurrentTier && (
+                                  <div className="text-xs font-semibold text-yellow-600 animate-pulse">
+                                    ⭐ You're Here!
+                                  </div>
+                                )}
+                                {isAchieved && !isCurrentTier && (
+                                  <div className="text-xs font-semibold text-green-600">
+                                    ✓ Achieved
+                                  </div>
+                                )}
+                                {isNextTier && !isCurrentTier && (
+                                  <div className="text-xs font-semibold text-blue-600">
+                                    🎯 Next Goal!
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {summary.rankBonus && summary.rankBonus.rank > 15 && (
+                        <div className="mt-3 text-sm text-center text-gray-600 font-semibold">
+                          You're ranked #{summary.rankBonus.rank} - Keep pushing for higher tiers! 💪
+                        </div>
+                      )}
                       
+                      {/* Motivational Message */}
+                      {(() => {
+                        let motivationalMessage = '';
+                        
+                        if (summary.rankBonus) {
+                          const currentTier = summary.bonusTiers!.find(t => 
+                            summary.rankBonus!.rank >= t.startRank && summary.rankBonus!.rank <= t.endRank
+                          );
+                          const currentTierIdx = currentTier ? summary.bonusTiers!.indexOf(currentTier) : -1;
+                          if (currentTierIdx > 0) {
+                            const nextTier = summary.bonusTiers![currentTierIdx - 1];
+                            const rankGap = nextTier.startRank - summary.rankBonus.rank;
+                            motivationalMessage = `🎯 Only ${rankGap} rank${rankGap > 1 ? 's' : ''} away from Rank ${nextTier.startRank}-${nextTier.endRank} bonus!`;
+                          }
+                        } else {
+                          const slab3Target = summary.bonusTiers![0]?.target || 0;
+                          const unitsNeeded = Math.max(0, slab3Target - summary.totalAchievement);
+                          if (unitsNeeded > 0) {
+                            motivationalMessage = `🚀 Reach ${slab3Target} units to unlock bonus tiers! ${unitsNeeded} more needed.`;
+                          }
+                        }
+                        
+                        return motivationalMessage ? (
+                          <div className={`mt-3 p-3 rounded-lg ${
+                            currentTheme.isDark 
+                              ? 'bg-blue-500/20 border border-blue-500/30' 
+                              : 'bg-blue-50 border border-blue-200'
+                          }`}>
+                            <div className="text-sm font-semibold text-center">
+                              {motivationalMessage}
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Slab Badges Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {summary.slabs.map((slab, index) => {
+                      const isActive = slab.achievement > 0 || index === 0;
+                      const status = isActive ? 'ACTIVE ⚡' : 'LOCKED';
+
                       return (
-                        <div 
-                          key={idx}
-                          className={`p-3 rounded-lg border-2 ${
-                            isCurrentTier
+                        <div
+                          key={`${summary.metric}-${slab.slab_Segment}`}
+                          className={`p-4 rounded-lg border-2 ${
+                            isActive
                               ? currentTheme.isDark
-                                ? 'bg-yellow-500/20 border-yellow-500/50 shadow-lg'
-                                : 'bg-yellow-100 border-yellow-300 shadow-lg'
-                              : isAchieved
-                              ? currentTheme.isDark
-                                ? 'bg-green-500/10 border-green-500/30'
-                                : 'bg-green-50 border-green-200'
+                                ? 'border-blue-500 bg-blue-500/10'
+                                : 'border-blue-400 bg-blue-50'
                               : currentTheme.isDark
-                              ? 'bg-gray-700/50 border-gray-600'
-                              : 'bg-gray-100 border-gray-300'
+                              ? 'border-gray-600 bg-gray-800/50'
+                              : 'border-gray-300 bg-gray-100'
                           }`}
                         >
-                          <div className="text-center">
-                            <div className={`text-lg font-bold mb-1 ${
-                              isCurrentTier 
-                                ? currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
-                                : isAchieved
-                                ? currentTheme.isDark ? 'text-green-400' : 'text-green-700'
-                                : currentTheme.isDark ? 'text-gray-500' : 'text-gray-400'
-                            }`}>
-                              Rank {tier.startRank}-{tier.endRank}
+                          {/* Slab Header */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">{getSlabEmoji(slab.slab_Segment)}</span>
+                              <span className="font-bold text-sm uppercase">{slab.slab_Segment || 'Slab'}</span>
                             </div>
-                            <div className={`text-2xl font-bold mb-1 ${
-                              isCurrentTier || isAchieved
-                                ? currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
-                                : currentTheme.isDark ? 'text-gray-500' : 'text-gray-400'
+                            <span className={`text-xs font-bold px-2 py-1 rounded ${
+                              isActive
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-400 text-gray-700'
                             }`}>
-                              {(tier.bonusPercent * 100).toFixed(0)}%
+                              {status}
+                            </span>
+                          </div>
+
+                          {/* Target Progress */}
+                          <div className="text-center mb-2">
+                            <div className="text-lg font-bold">
+                              {slab.achievement.toLocaleString()} / {slab.target.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-600 mb-2">Bonus Multiplier</div>
-                            {isCurrentTier && (
-                              <div className="text-xs font-semibold text-yellow-600 animate-pulse">
-                                ⭐ You're Here!
-                              </div>
-                            )}
-                            {isAchieved && !isCurrentTier && (
-                              <div className="text-xs font-semibold text-green-600">
-                                ✓ Achieved
-                              </div>
-                            )}
-                            {isNextTier && !isCurrentTier && (
-                              <div className="text-xs font-semibold text-blue-600">
-                                🎯 Next Goal!
-                              </div>
-                            )}
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="flex-1 bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${getProgressBarColor(slab.achievement_percentage)}`}
+                                style={{ width: `${Math.min(slab.achievement_percentage, 100)}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-xs font-medium w-12">{slab.achievement_percentage.toFixed(1)}%</span>
+                          </div>
+
+                          {/* Earnings Section */}
+                          <div className="border-t border-gray-300 pt-2 mt-2 space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Earned:</span>
+                              <span className="font-semibold text-green-600">{formatCurrency(slab.earnings)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Pending:</span>
+                              <span className="font-semibold text-orange-600">{formatCurrency(slab.pendingToEarn)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500 mt-1 pt-1 border-t border-gray-200">
+                              <span>{(slab.incentivePercent * 100).toFixed(0)}% incentive</span>
+                              <span>Max: {formatCurrency(slab.potentialEarnings)}</span>
+                            </div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  {summary.rankBonus && summary.rankBonus.rank > 15 && (
-                    <div className="mt-3 text-sm text-center text-gray-600 font-semibold">
-                      You're ranked #{summary.rankBonus.rank} - Keep pushing for higher tiers! 💪
-                    </div>
-                  )}
-                  
-                  {/* Motivational Message */}
-                  {(() => {
-                    let motivationalMessage = '';
-                    
-                    if (summary.rankBonus) {
-                      const currentTier = summary.bonusTiers!.find(t => 
-                        summary.rankBonus!.rank >= t.startRank && summary.rankBonus!.rank <= t.endRank
-                      );
-                      const currentTierIdx = currentTier ? summary.bonusTiers!.indexOf(currentTier) : -1;
-                      if (currentTierIdx > 0) {
-                        const nextTier = summary.bonusTiers![currentTierIdx - 1];
-                        const rankGap = nextTier.startRank - summary.rankBonus.rank;
-                        motivationalMessage = `🎯 Only ${rankGap} rank${rankGap > 1 ? 's' : ''} away from Rank ${nextTier.startRank}-${nextTier.endRank} bonus!`;
-                      }
-                    } else {
-                      const slab3Target = summary.bonusTiers![0]?.target || 0;
-                      const unitsNeeded = Math.max(0, slab3Target - summary.totalAchievement);
-                      if (unitsNeeded > 0) {
-                        motivationalMessage = `🚀 Reach ${slab3Target} units to unlock bonus tiers! ${unitsNeeded} more needed.`;
-                      }
-                    }
-                    
-                    return motivationalMessage ? (
-                      <div className={`mt-3 p-3 rounded-lg ${
-                        currentTheme.isDark 
-                          ? 'bg-blue-500/20 border border-blue-500/30' 
-                          : 'bg-blue-50 border border-blue-200'
-                      }`}>
-                        <div className="text-sm font-semibold text-center">
-                          {motivationalMessage}
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
                 </div>
-              )}
-
-              {/* Slab Badges Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {summary.slabs.map((slab, index) => {
-                  const isActive = slab.achievement > 0 || index === 0;
-                  const status = isActive ? 'ACTIVE ⚡' : 'LOCKED';
-
-                  return (
-                    <div
-                      key={`${summary.metric}-${slab.slab_Segment}`}
-                      className={`p-4 rounded-lg border-2 ${
-                        isActive
-                          ? currentTheme.isDark
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : 'border-blue-400 bg-blue-50'
-                          : currentTheme.isDark
-                          ? 'border-gray-600 bg-gray-800/50'
-                          : 'border-gray-300 bg-gray-100'
-                      }`}
-                    >
-                      {/* Slab Header */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{getSlabEmoji(slab.slab_Segment)}</span>
-                          <span className="font-bold text-sm uppercase">{slab.slab_Segment || 'Slab'}</span>
-                        </div>
-                        <span className={`text-xs font-bold px-2 py-1 rounded ${
-                          isActive
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-400 text-gray-700'
-                        }`}>
-                          {status}
-                        </span>
-                      </div>
-
-                      {/* Target Progress */}
-                      <div className="text-center mb-2">
-                        <div className="text-lg font-bold">
-                          {slab.achievement.toLocaleString()} / {slab.target.toLocaleString()}
-                        </div>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="flex items-center gap-2 mb-2">
-          <div className="flex-1 bg-gray-200 rounded-full h-2">
-            <div
-                            className={`h-2 rounded-full ${getProgressBarColor(slab.achievement_percentage)}`}
-                            style={{ width: `${Math.min(slab.achievement_percentage, 100)}%` }}
-            ></div>
-          </div>
-                        <span className="text-xs font-medium w-12">{slab.achievement_percentage.toFixed(1)}%</span>
-                      </div>
-
-                      {/* Earnings Section */}
-                      <div className="border-t border-gray-300 pt-2 mt-2 space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Earned:</span>
-                          <span className="font-semibold text-green-600">{formatCurrency(slab.earnings)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Pending:</span>
-                          <span className="font-semibold text-orange-600">{formatCurrency(slab.pendingToEarn)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-500 mt-1 pt-1 border-t border-gray-200">
-                          <span>{(slab.incentivePercent * 100).toFixed(0)}% incentive</span>
-                          <span>Max: {formatCurrency(slab.potentialEarnings)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
 
         {/* Priority Hint */}
         {priorityMetric && (

@@ -902,15 +902,15 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                         currentTheme.isDark ? 'bg-purple-500/20' : 'bg-purple-500'
-                      }`}>
+                  }`}>
                         <span className="text-xl">💰</span>
-                      </div>
+                  </div>
                       <h3 className={`text-xl font-bold ${
                         currentTheme.isDark ? 'text-white' : 'text-gray-900'
-                      }`}>
+                    }`}>
                         Performance Overview
                       </h3>
-                    </div>
+                  </div>
                     
                     {/* Day/Week Toggle */}
                     <div className="flex gap-1 sm:gap-2">
@@ -938,20 +938,20 @@ export default function DashboardPage() {
                       >
                         WEEK
                       </button>
-                    </div>
-                  </div>
+                </div>
+                </div>
 
                   {/* Cluster and City Ranks */}
                   <div className="flex items-center mb-2 sm:mb-4">
                     <div className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg flex-shrink-0 ${
                       currentTheme.isDark ? 'bg-yellow-500/20' : 'bg-yellow-100'
-                    }`}>
+                  }`}>
                       <span className="text-xs sm:text-sm font-medium">🏆 CLUSTER RANK</span>
                       <span className={`ml-1 sm:ml-2 text-base sm:text-lg font-bold ${
                         currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-700'
-                      }`}>
+                  }`}>
                         {clusterRank}
-                      </span>
+                  </span>
                     </div>
                     <div className="flex-1"></div>
                     <div className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg flex-shrink-0 ${
@@ -960,11 +960,11 @@ export default function DashboardPage() {
                       <span className="text-xs sm:text-sm font-medium">🌆 CITY RANK</span>
                       <span className={`ml-1 sm:ml-2 text-base sm:text-lg font-bold ${
                         currentTheme.isDark ? 'text-blue-400' : 'text-blue-700'
-                      }`}>
+                  }`}>
                         {cityRank}
-                      </span>
-                    </div>
-                  </div>
+                    </span>
+                </div>
+              </div>
 
                   {/* Render based on view mode with AB metrics logic */}
                   {(() => {
@@ -1021,19 +1021,19 @@ export default function DashboardPage() {
                         {/* Info message for AB metrics in Day view */}
                         {hasABMetrics && (
                           <div className={`mb-4 p-3 rounded-lg border ${
-                            currentTheme.isDark 
+                    currentTheme.isDark
                               ? 'bg-blue-500/10 border-blue-500/20' 
                               : 'bg-blue-50 border-blue-200'
-                          }`}>
+                  }`}>
                             <div className="flex items-center gap-2">
                               <span className="text-blue-500">ℹ️</span>
                               <span className={`text-sm ${
                                 currentTheme.isDark ? 'text-blue-300' : 'text-blue-700'
-                              }`}>
+                    }`}>
                                 AB metrics are displayed at weekly level
                               </span>
-                            </div>
-                          </div>
+                  </div>
+                </div>
                         )}
 
                         {/* Performance View */}
@@ -1057,8 +1057,8 @@ export default function DashboardPage() {
                     >
                       👉 View Detailed Slab Breakdown
                     </button>
-                  </div>
                 </div>
+              </div>
               </ThemedCard>
             )}
 
@@ -1081,7 +1081,7 @@ export default function DashboardPage() {
                             showLastOrder={true}
                             tabType="assigned"
                           />
-                        </div>
+                </div>
                       );
                     }
                     
@@ -1096,7 +1096,7 @@ export default function DashboardPage() {
                             showLastOrder={true}
                             tabType="inactive"
                           />
-                        </div>
+              </div>
                       );
                     }
                     
@@ -1224,17 +1224,17 @@ export default function DashboardPage() {
 
               {/* Subtitle */}
               <div className="mb-4">
-                <p className={`text-sm ${
-                  currentTheme.isDark 
-                    ? 'text-gray-300' 
-                    : currentTheme.isNeon 
-                    ? 'text-gray-300'
-                    : 'text-gray-600'
-                }`}>
+                    <p className={`text-sm ${
+                      currentTheme.isDark 
+                        ? 'text-gray-300' 
+                        : currentTheme.isNeon 
+                        ? 'text-gray-300'
+                        : 'text-gray-600'
+                    }`}>
                   Top performers this {leaderboardViewMode === 'day' ? 'day' : 'week'}
-                </p>
-              </div>
-
+                    </p>
+                </div>
+                
               {/* Cluster/City Toggle - below Leaderboard title */}
               <div className="mb-6 relative z-10">
                 <div className={`flex rounded-xl p-1 shadow-lg relative z-10 ${
@@ -1244,7 +1244,7 @@ export default function DashboardPage() {
                     ? 'bg-gray-700/30 backdrop-blur-sm'
                     : 'bg-gray-100 shadow-gray-200/50'
                   }`}>
-                  <button
+                    <button
                     type="button"
                     onClick={() => setLeaderboardType('cluster')}
                     className={`relative z-10 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 min-h-[44px] w-full touch-manipulation ${
@@ -1257,9 +1257,9 @@ export default function DashboardPage() {
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                     }`}
                   >
-                    Cluster
-                  </button>
-                  <button
+                      Cluster
+                    </button>
+                    <button
                     type="button"
                     onClick={() => setLeaderboardType('city')}
                     className={`relative z-10 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 min-h-[44px] w-full touch-manipulation ${
@@ -1272,8 +1272,8 @@ export default function DashboardPage() {
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                     }`}
                   >
-                    City
-                  </button>
+                      City
+                    </button>
                 </div>
               </div>
               
@@ -1437,7 +1437,7 @@ export default function DashboardPage() {
                   showLastOrder={true}
                   tabType="assigned"
                 />
-              </div>
+          </div>
             )}
 
             {/* App Funnel Card */}
@@ -1451,7 +1451,7 @@ export default function DashboardPage() {
                   showLastOrder={true}
                   tabType="inactive"
                 />
-              </div>
+        </div>
             )}
 
             {/* Priority Customers Card */}

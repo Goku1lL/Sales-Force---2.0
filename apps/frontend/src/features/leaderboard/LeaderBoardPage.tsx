@@ -273,7 +273,7 @@ export default function LeaderBoardPage() {
             {(slabMetrics as any[]).map(slab => renderSlabBadge(slab))}
           </div>
         </div>
-      );
+  );
     });
   };
 

@@ -4,6 +4,16 @@ import { getPrisma } from '../lib/prisma';
 
 const router = Router();
 
+// Helper function to calculate current yearweek from date
+function getCurrentYearweek(date?: Date): string {
+  const today = date || new Date();
+  const year = today.getFullYear();
+  const start = new Date(year, 0, 1);
+  const days = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const week = Math.ceil((days + start.getDay() + 1) / 7);
+  return year + String(week).padStart(2, '0');
+}
+
 // Get user profile with cluster, city and ranking info
 router.get('/profile/:employeeId', async (req, res, next) => {
   try {
@@ -27,6 +37,9 @@ router.get('/profile/:employeeId', async (req, res, next) => {
     const cluster = emp.cluster || 'Unknown';
     const city = emp.city_name || 'Unknown';
 
+    // Calculate current yearweek from today's date
+    const currentYearweek = getCurrentYearweek();
+
             // Calculate current week ranking based on weekly achievements for cluster
     const currentWeekRanking = await prisma.$queryRawUnsafe<any[]>(
       `SELECT @rank := @rank + 1 as rank, t.*
@@ -39,13 +52,13 @@ router.get('/profile/:employeeId', async (req, res, next) => {
          FROM Executive e
          LEFT JOIN WeekAchievement wa ON e.employee_id = wa.employee_id
            AND wa.deleted = 0
-           AND wa.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
+           AND wa.yearweek = ?
          WHERE e.deleted = 0 AND e.cluster = ?
          GROUP BY e.employee_id, e.Name, e.cluster
                      ORDER BY weekly_achievements DESC
        ) t
        CROSS JOIN (SELECT @rank := 0) r`,
-      cluster
+      currentYearweek, cluster
     );
 
     // Calculate city ranking
@@ -62,13 +75,13 @@ router.get('/profile/:employeeId', async (req, res, next) => {
          LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
          LEFT JOIN WeekAchievement wa ON e.employee_id = wa.employee_id
            AND wa.deleted = 0
-           AND wa.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
+           AND wa.yearweek = ?
          WHERE e.deleted = 0 AND e.CityId = ?
          GROUP BY e.employee_id, e.Name, e.CityId, cd.City
                      ORDER BY weekly_achievements DESC
        ) t
        CROSS JOIN (SELECT @rank := 0) r`,
-      emp.CityId
+      currentYearweek, emp.CityId
     );
 
     const userClusterRank = currentWeekRanking.find(r => r.employee_id === employeeId);
@@ -130,6 +143,9 @@ router.get('/cluster/:cluster', async (req, res, next) => {
           );
           res.json({ status: 'success', data: rows });
         } else {
+          // Calculate current yearweek from today's date
+          const currentYearweek = getCurrentYearweek();
+          
           // Get cluster leaderboard based on weekly achievements percentage
           const rows = await prisma.$queryRawUnsafe<any[]>(
             `SELECT @rank := @rank + 1 as rank, t.*
@@ -138,11 +154,11 @@ router.get('/cluster/:cluster', async (req, res, next) => {
                  e.employee_id,
                  e.Name,
                  e.cluster,
-                 COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as achievement,
-                 COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as target,
+                 COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as achievement,
+                 COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as target,
                  CASE 
-                   WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) > 0 
-                   THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0)) * 100
+                   WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) > 0 
+                   THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0)) * 100
                    ELSE 0
                  END as achievement_percentage
                FROM Executive e
@@ -151,7 +167,7 @@ router.get('/cluster/:cluster', async (req, res, next) => {
                LIMIT 100
              ) t
              CROSS JOIN (SELECT @rank := 0) r`,
-            cluster
+            currentYearweek, currentYearweek, currentYearweek, currentYearweek, currentYearweek, cluster
           );
           res.json({ status: 'success', data: rows });
         }
@@ -192,6 +208,9 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
       );
       res.json({ status: 'success', data: rows });
     } else {
+      // Calculate current yearweek from today's date
+      const currentYearweek = getCurrentYearweek();
+      
       // Get city leaderboard based on weekly achievements percentage
       const rows = await prisma.$queryRawUnsafe<any[]>(
         `SELECT @rank := @rank + 1 as rank, t.*
@@ -201,11 +220,11 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
              e.Name,
              e.CityId,
              cd.City as city_name,
-             COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as achievement,
-             COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) as target,
+             COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as achievement,
+             COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as target,
              CASE 
-               WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) > 0 
-               THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0) AND deleted = 0), 0)) * 100
+               WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) > 0 
+               THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0)) * 100
                ELSE 0
              END as achievement_percentage
            FROM Executive e
@@ -215,7 +234,7 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
            LIMIT 100
          ) t
          CROSS JOIN (SELECT @rank := 0) r`,
-        cityId
+        currentYearweek, currentYearweek, currentYearweek, currentYearweek, currentYearweek, cityId
       );
       res.json({ status: 'success', data: rows });
     }
@@ -249,7 +268,7 @@ router.get('/my-rank/:employeeId', authMiddleware, async (req, res, next) => {
              FROM Executive e
              LEFT JOIN WeekAchievement wa ON e.employee_id = wa.employee_id
                AND wa.deleted = 0
-               AND wa.yearweek = (SELECT MAX(yearweek) FROM WeekTargets WHERE deleted = 0)
+               AND wa.yearweek = ?
              WHERE e.deleted = 0 AND e.cluster = ?
              GROUP BY e.employee_id
              ORDER BY weekly_achievements DESC
@@ -340,26 +359,25 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       employeeId, today
     );
 
+    // Calculate current yearweek from today's date
+    const currentYearweek = getCurrentYearweek();
+
     // Get weekly achievements for current week
     const weeklyAchievementsRaw = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, SUM(Achievement) as achievement, SUM(variable_pay) as achievement_earnings
        FROM WeekAchievement 
-       WHERE employee_id = ? AND yearweek = (
-         SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
-       ) AND deleted = 0
+       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
        GROUP BY metric`,
-      employeeId, employeeId
+      employeeId, currentYearweek
     );
 
     // Get weekly targets with all slabs
     const weeklyTargets = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, target, incentive_percent, slab_Segment, contribution
        FROM WeekTargets
-       WHERE employee_id = ? AND yearweek = (
-         SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
-       ) AND deleted = 0
+       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
        ORDER BY metric, slab_Segment`,
-      employeeId, employeeId
+      employeeId, currentYearweek
     );
 
     // Create achievement lookup maps
@@ -465,12 +483,6 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
     });
 
     // Query rank-based bonus data from SA_EmployeeBonus table for weekly metrics
-    const currentYearweekResult = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT MAX(yearweek) as yearweek FROM WeekTargets WHERE employee_id = ? AND deleted = 0`,
-      employeeId
-    );
-    const currentYearweek = currentYearweekResult[0]?.yearweek;
-
     let weeklyBonusMap: Record<string, any> = {};
     let weeklyBonusTiersMap: Record<string, any[]> = {};
     

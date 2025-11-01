@@ -4,6 +4,16 @@ import { getPrisma } from '../lib/prisma';
 
 const router = Router();
 
+// Helper function to calculate current yearweek from date
+function getCurrentYearweek(date?: Date): string {
+  const today = date || new Date();
+  const year = today.getFullYear();
+  const start = new Date(year, 0, 1);
+  const days = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const week = Math.ceil((days + start.getDay() + 1) / 7);
+  return year + String(week).padStart(2, '0');
+}
+
 router.get('/summary', async (req, res, next) => {
   try {
     const employeeId = req.query.employeeId as string;
@@ -129,26 +139,25 @@ router.get('/summary', async (req, res, next) => {
       return total + (target * rate);
     }, 0);
 
+    // Calculate current yearweek from today's date
+    const currentYearweek = getCurrentYearweek();
+
     // Get weekly achievements separately (grouped by metric to avoid duplication)
     const weeklyAchievementsRaw = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, SUM(Achievement) as achievement, SUM(variable_pay) as variable_pay
        FROM WeekAchievement 
-       WHERE employee_id = ? AND yearweek = (
-         SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
-       ) AND deleted = 0
+       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
        GROUP BY metric`,
-      employeeId, employeeId
+      employeeId, currentYearweek
     );
 
     // Get weekly targets with all slabs
     const weeklyTargets = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, target, slab_Segment, incentive_percent, contribution
        FROM WeekTargets
-       WHERE employee_id = ? AND yearweek = (
-         SELECT MAX(yearweek) FROM WeekTargets WHERE employee_id = ? AND deleted = 0
-       ) AND deleted = 0
+       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
        ORDER BY metric, slab_Segment`,
-      employeeId, employeeId
+      employeeId, currentYearweek
     );
 
     // Create weekly achievement lookup map
@@ -204,12 +213,7 @@ router.get('/summary', async (req, res, next) => {
       group.totalEarnings = earned;
     });
 
-    // Query rank-based bonus data from SA_EmployeeBonus table
-    const currentYearweekResult = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT MAX(yearweek) as yearweek FROM WeekTargets WHERE employee_id = ? AND deleted = 0`,
-      employeeId
-    );
-    const currentYearweek = currentYearweekResult[0]?.yearweek;
+    // Use calculated current yearweek (already set above)
 
     let bonusMap: Record<string, any> = {};
     let bonusTiersMap: Record<string, any[]> = {};
