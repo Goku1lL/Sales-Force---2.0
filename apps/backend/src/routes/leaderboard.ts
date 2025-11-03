@@ -359,6 +359,16 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       employeeId, today
     );
 
+    // Get eligibility metric for daily period
+    const dailyEligibilityMetric = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, MAX(target) as maxTarget
+       FROM DayTargets
+       WHERE employee_id = ? AND date = ? AND eligibility = 1 AND deleted = 0
+       GROUP BY metric
+       LIMIT 1`,
+      employeeId, today
+    );
+
     // Calculate current yearweek from today's date
     const currentYearweek = getCurrentYearweek();
 
@@ -380,6 +390,16 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       employeeId, currentYearweek
     );
 
+    // Get eligibility metric for weekly period
+    const weeklyEligibilityMetric = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, MAX(target) as maxTarget
+       FROM WeekTargets
+       WHERE employee_id = ? AND yearweek = ? AND eligibility = 1 AND deleted = 0
+       GROUP BY metric
+       LIMIT 1`,
+      employeeId, currentYearweek
+    );
+
     // Create achievement lookup maps
     const dailyAchievementMap = dailyAchievementsRaw.reduce((map: Record<string, any>, item) => {
       map[item.metric] = {
@@ -396,6 +416,34 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
       };
       return map;
     }, {});
+
+    // Check daily eligibility achievement status
+    let dailyEligibilityStatus = null;
+    if (dailyEligibilityMetric.length > 0) {
+      const eligMetric = dailyEligibilityMetric[0];
+      const achievement = dailyAchievementMap[eligMetric.metric]?.achievement || 0;
+      const target = Number(eligMetric.maxTarget || 0);
+      dailyEligibilityStatus = {
+        metric: eligMetric.metric,
+        target: target,
+        achievement: achievement,
+        isEligible: achievement >= target
+      };
+    }
+
+    // Check weekly eligibility achievement status
+    let weeklyEligibilityStatus = null;
+    if (weeklyEligibilityMetric.length > 0) {
+      const eligMetric = weeklyEligibilityMetric[0];
+      const achievement = weeklyAchievementMap[eligMetric.metric]?.achievement || 0;
+      const target = Number(eligMetric.maxTarget || 0);
+      weeklyEligibilityStatus = {
+        metric: eligMetric.metric,
+        target: target,
+        achievement: achievement,
+        isEligible: achievement >= target
+      };
+    }
 
     // Group targets by metric and calculate totals
     const dailyMetricGroups = dailyTargets.reduce((groups: Record<string, any>, item) => {
@@ -583,6 +631,7 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
           cityId: emp.CityId
         },
         daily: {
+          eligibilityStatus: dailyEligibilityStatus,
           date: today,
           metrics: dailyTargets.map(target => {
             const achievement = dailyAchievementMap[target.metric];
@@ -602,6 +651,7 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
           employee_variable_pay: employeeVariablePay
         },
         weekly: {
+          eligibilityStatus: weeklyEligibilityStatus,
           metrics: weeklyTargets.map(target => {
             const achievement = weeklyAchievementMap[target.metric];
             const metricGroup = weeklyMetricGroups[target.metric];

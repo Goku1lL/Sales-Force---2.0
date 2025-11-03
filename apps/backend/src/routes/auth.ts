@@ -12,15 +12,19 @@ function getBaseUrl(req: any) {
   return String(origin).replace(/\/$/, '');
 }
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: false,
-  auth: process.env.SMTP_USER ? {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  } : undefined,
-});
+// Create transporter only when SMTP is configured
+function getTransporter() {
+  if (!process.env.SMTP_HOST) return null;
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: process.env.SMTP_USER ? {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD,
+    } : undefined,
+  });
+}
 
 router.post('/signup', async (req, res, next) => {
   try {
@@ -42,13 +46,22 @@ router.post('/signup', async (req, res, next) => {
     const link = `${getBaseUrl(req)}/verify?token=${token}`;
 
     if (process.env.SMTP_HOST) {
-      await transporter.sendMail({
-        from: process.env.SMTP_USER,
-        to: email,
-        subject: 'Verify your account',
-        text: `Click to verify: ${link}`,
-        html: `<p>Click to verify: <a href="${link}">Verify</a></p>`
-      });
+      try {
+        const transporter = getTransporter();
+        if (transporter) {
+          await transporter.sendMail({
+            from: process.env.SMTP_USER,
+            to: email,
+            subject: 'Verify your account',
+            text: `Click to verify: ${link}`,
+            html: `<p>Click to verify: <a href="${link}">Verify</a></p>`
+          });
+        }
+      } catch (smtpError: any) {
+        console.error('SMTP error:', smtpError.message);
+        // Continue without email - log the link instead
+        console.log(`🔗 Verification link for ${email}: ${link}`);
+      }
     }
 
     return res.json({ message: 'Signup initiated. Check your email to verify.' });
@@ -81,13 +94,22 @@ router.post('/forgot-password', async (req, res, next) => {
     const link = `${getBaseUrl(req)}/reset-password?token=${token}`;
 
     if (process.env.SMTP_HOST) {
-      await transporter.sendMail({
-        from: process.env.SMTP_USER,
-        to: email,
-        subject: 'Reset your password',
-        text: `Click to reset: ${link}`,
-        html: `<p>Click to reset: <a href="${link}">Reset Password</a></p>`
-      });
+      try {
+        const transporter = getTransporter();
+        if (transporter) {
+          await transporter.sendMail({
+            from: process.env.SMTP_USER,
+            to: email,
+            subject: 'Reset your password',
+            text: `Click to reset: ${link}`,
+            html: `<p>Click to reset: <a href="${link}">Reset Password</a></p>`
+          });
+        }
+      } catch (smtpError: any) {
+        console.error('SMTP error:', smtpError.message);
+        // Continue without email - log the reset link instead
+        console.log(`🔗 Password reset link for ${email}: ${link}`);
+      }
     } else {
       // For development - log the reset link to console
       console.log(`🔗 Password reset link for ${email}: ${link}`);

@@ -7,13 +7,29 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setStatus(null);
-    const res = await fetch('/api/v1/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await res.json();
-    setStatus(data.message || 'If the email exists, a reset link has been sent');
+    const baseUrl = process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000/api/v1'
+      : 'https://sales-force-2-0.onrender.com/api/v1';
+    try {
+      const res = await fetch(`${baseUrl}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (err) {
+        // Handle case where response is not JSON
+        if (!res.ok) {
+          setStatus(`Error: ${res.status} ${res.statusText}`);
+          return;
+        }
+      }
+      setStatus(data.message || 'If the email exists, a reset link has been sent');
+    } catch (err: any) {
+      setStatus('Network error. Please try again.');
+    }
   };
 
   return (

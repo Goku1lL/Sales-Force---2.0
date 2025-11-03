@@ -14,7 +14,10 @@ export default function SignupPage() {
     setStatus(null);
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/auth/signup', {
+      const baseUrl = process.env.NODE_ENV === 'development'
+        ? 'http://localhost:3000/api/v1'
+        : 'https://sales-force-2-0.onrender.com/api/v1';
+      const res = await fetch(`${baseUrl}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, full_name, password })

@@ -10,13 +10,29 @@ export default function ResetPasswordPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setStatus(null);
-    const res = await fetch('/api/v1/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, newPassword })
-    });
-    const data = await res.json();
-    if (!res.ok) setStatus(data.message || 'Reset failed'); else setStatus('Password updated. You can login now.');
+    const baseUrl = process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000/api/v1'
+      : 'https://sales-force-2-0.onrender.com/api/v1';
+    try {
+      const res = await fetch(`${baseUrl}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword })
+      });
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (err) {
+        // Handle case where response is not JSON
+        if (!res.ok) {
+          setStatus(`Error: ${res.status} ${res.statusText}`);
+          return;
+        }
+      }
+      if (!res.ok) setStatus(data.message || 'Reset failed'); else setStatus('Password updated. You can login now.');
+    } catch (err: any) {
+      setStatus('Network error. Please try again.');
+    }
   };
 
   return (

@@ -78,6 +78,30 @@ router.get('/summary', async (req, res, next) => {
       employeeId, today
     );
 
+    // Get eligibility metric for daily period
+    const dailyEligibilityMetric = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, MAX(target) as maxTarget
+       FROM DayTargets
+       WHERE employee_id = ? AND date = ? AND eligibility = 1 AND deleted = 0
+       GROUP BY metric
+       LIMIT 1`,
+      employeeId, today
+    );
+
+    // Check daily eligibility achievement status
+    let dailyEligibilityStatus = null;
+    if (dailyEligibilityMetric.length > 0) {
+      const eligMetric = dailyEligibilityMetric[0];
+      const achievement = dailyAchievementMap[eligMetric.metric]?.achievement || 0;
+      const target = Number(eligMetric.maxTarget || 0);
+      dailyEligibilityStatus = {
+        metric: eligMetric.metric,
+        target: target,
+        achievement: achievement,
+        isEligible: achievement >= target
+      };
+    }
+
     // Group targets by metric and calculate totals properly
     const metricGroups = dailyTargets.reduce((groups: Record<string, any>, row) => {
       const metric = row.metric;
@@ -151,6 +175,15 @@ router.get('/summary', async (req, res, next) => {
       employeeId, currentYearweek
     );
 
+    // Create weekly achievement lookup map first (needed for eligibility check)
+    const weeklyAchievementMap = weeklyAchievementsRaw.reduce((map: Record<string, any>, item) => {
+      map[item.metric] = {
+        achievement: Number(item.achievement || 0),
+        variable_pay: Number(item.variable_pay || 0)
+      };
+      return map;
+    }, {});
+
     // Get weekly targets with all slabs
     const weeklyTargets = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, target, slab_Segment, incentive_percent, contribution
@@ -160,14 +193,29 @@ router.get('/summary', async (req, res, next) => {
       employeeId, currentYearweek
     );
 
-    // Create weekly achievement lookup map
-    const weeklyAchievementMap = weeklyAchievementsRaw.reduce((map: Record<string, any>, item) => {
-      map[item.metric] = {
-        achievement: Number(item.achievement || 0),
-        variable_pay: Number(item.variable_pay || 0)
+    // Get eligibility metric for weekly period
+    const weeklyEligibilityMetric = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT metric, MAX(target) as maxTarget
+       FROM WeekTargets
+       WHERE employee_id = ? AND yearweek = ? AND eligibility = 1 AND deleted = 0
+       GROUP BY metric
+       LIMIT 1`,
+      employeeId, currentYearweek
+    );
+
+    // Check weekly eligibility achievement status
+    let weeklyEligibilityStatus = null;
+    if (weeklyEligibilityMetric.length > 0) {
+      const eligMetric = weeklyEligibilityMetric[0];
+      const achievement = weeklyAchievementMap[eligMetric.metric]?.achievement || 0;
+      const target = Number(eligMetric.maxTarget || 0);
+      weeklyEligibilityStatus = {
+        metric: eligMetric.metric,
+        target: target,
+        achievement: achievement,
+        isEligible: achievement >= target
       };
-      return map;
-    }, {});
+    }
 
     // Group weekly targets by metric and calculate totals properly
     const weeklyMetricGroups = weeklyTargets.reduce((groups: Record<string, any>, row) => {
@@ -330,6 +378,9 @@ router.get('/summary', async (req, res, next) => {
         // Legacy fields for backward compatibility (now show potential earnings)
         todayTarget: todayPotentialEarnings,
         weeklyTarget: weeklyPotentialEarnings,
+        // Eligibility status
+        dailyEligibilityStatus,
+        weeklyEligibilityStatus,
       }
     });
   } catch (err) { next(err); }

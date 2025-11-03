@@ -888,6 +888,41 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Eligibility Warning Banner */}
+        {(() => {
+          const eligibilityStatus = viewMode === 'day' 
+            ? summary?.data?.dailyEligibilityStatus 
+            : summary?.data?.weeklyEligibilityStatus;
+          
+          if (eligibilityStatus && !eligibilityStatus.isEligible) {
+            return (
+              <div className={`mb-6 p-4 rounded-lg border-2 ${
+                currentTheme.isDark 
+                  ? 'bg-yellow-500/10 border-yellow-500/30' 
+                  : 'bg-yellow-50 border-yellow-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">⚠️</span>
+                  <div className="flex-1">
+                    <div className={`font-semibold mb-1 ${
+                      currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-800'
+                    }`}>
+                      Eligibility requirement: Achieve {eligibilityStatus.metric} target of {eligibilityStatus.target.toLocaleString()} to be eligible for Variable Pay
+                    </div>
+                    <div className={`text-sm ${
+                      currentTheme.isDark ? 'text-yellow-300' : 'text-yellow-700'
+                    }`}>
+                      Current achievement: {eligibilityStatus.achievement.toLocaleString()} / {eligibilityStatus.target.toLocaleString()} 
+                      ({eligibilityStatus.target > 0 ? ((eligibilityStatus.achievement / eligibilityStatus.target) * 100).toFixed(1) : '0.0'}%)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Left Column - Target Cards */}

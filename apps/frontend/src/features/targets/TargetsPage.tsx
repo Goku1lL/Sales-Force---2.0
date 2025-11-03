@@ -292,6 +292,41 @@ export default function TargetsPage() {
 
     return (
       <>
+        {/* Eligibility Warning Banner */}
+        {(() => {
+          const eligibilityStatus = viewMode === 'day' 
+            ? employeeDetails?.daily?.eligibilityStatus 
+            : employeeDetails?.weekly?.eligibilityStatus;
+          
+          if (eligibilityStatus && !eligibilityStatus.isEligible) {
+            return (
+              <div className={`mb-6 p-4 rounded-lg border-2 ${
+                currentTheme.isDark 
+                  ? 'bg-yellow-500/10 border-yellow-500/30' 
+                  : 'bg-yellow-50 border-yellow-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">⚠️</span>
+                  <div className="flex-1">
+                    <div className={`font-semibold mb-1 ${
+                      currentTheme.isDark ? 'text-yellow-400' : 'text-yellow-800'
+                    }`}>
+                      Eligibility requirement: Achieve {eligibilityStatus.metric} target of {eligibilityStatus.target.toLocaleString()} to be eligible for Variable Pay
+                    </div>
+                    <div className={`text-sm ${
+                      currentTheme.isDark ? 'text-yellow-300' : 'text-yellow-700'
+                    }`}>
+                      Current achievement: {eligibilityStatus.achievement.toLocaleString()} / {eligibilityStatus.target.toLocaleString()} 
+                      ({eligibilityStatus.target > 0 ? ((eligibilityStatus.achievement / eligibilityStatus.target) * 100).toFixed(1) : '0.0'}%)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+        
         {/* Hero Section: Total Pending to Earn */}
         <div className="mb-3 sm:mb-6">
           <div className="text-center mb-2">
@@ -311,7 +346,7 @@ export default function TargetsPage() {
               <div
                 className={`h-3 rounded-full ${getProgressBarColor(overallProgress)}`}
                 style={{ width: `${Math.min(overallProgress, 100)}%` }}
-              ></div>
+            ></div>
             </div>
             <span className="text-sm font-medium w-16">{overallProgress.toFixed(1)}%</span>
           </div>
