@@ -10,28 +10,46 @@ export default function ResetPasswordPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setStatus(null);
-    const baseUrl = process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000/api/v1'
-      : 'https://sales-force-2-0.onrender.com/api/v1';
+    
+    // Use Vite environment variables with fallback
+    const baseUrl = (import.meta.env.VITE_BACKEND_URL || 
+      (import.meta.env.DEV 
+        ? 'http://localhost:3000/api/v1' 
+        : 'https://sales-force-2-0.onrender.com/api/v1'
+      ));
+    
     try {
       const res = await fetch(`${baseUrl}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword })
       });
+      
       let data: any = {};
       try {
-        data = await res.json();
-      } catch (err) {
+        const text = await res.text();
+        if (text) {
+          data = JSON.parse(text);
+        }
+      } catch (parseErr) {
         // Handle case where response is not JSON
         if (!res.ok) {
-          setStatus(`Error: ${res.status} ${res.statusText}`);
+          const errorMsg = `Error ${res.status}: ${res.statusText || 'Server error'}`;
+          console.error('Reset password error:', errorMsg);
+          setStatus(errorMsg);
           return;
         }
       }
-      if (!res.ok) setStatus(data.message || 'Reset failed'); else setStatus('Password updated. You can login now.');
+      
+      if (!res.ok) {
+        setStatus(data.message || `Error ${res.status}: Reset failed`);
+        return;
+      }
+      
+      setStatus('Password updated. You can login now.');
     } catch (err: any) {
-      setStatus('Network error. Please try again.');
+      console.error('Network error:', err);
+      setStatus(`Network error: ${err.message || 'Please check your connection and try again.'}`);
     }
   };
 

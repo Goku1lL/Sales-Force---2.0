@@ -14,9 +14,12 @@ export default function SignupPage() {
     setStatus(null);
     setLoading(true);
     try {
-      const baseUrl = process.env.NODE_ENV === 'development'
-        ? 'http://localhost:3000/api/v1'
-        : 'https://sales-force-2-0.onrender.com/api/v1';
+      // Use Vite environment variables with fallback
+      const baseUrl = (import.meta.env.VITE_BACKEND_URL || 
+        (import.meta.env.DEV 
+          ? 'http://localhost:3000/api/v1' 
+          : 'https://sales-force-2-0.onrender.com/api/v1'
+        ));
       const res = await fetch(`${baseUrl}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
