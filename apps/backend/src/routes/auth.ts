@@ -23,7 +23,23 @@ function getTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
     } : undefined,
+    // Add connection timeout
+    connectionTimeout: 10000, // 10 seconds
+    socketTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000, // 10 seconds
   });
+}
+
+// Wrapper function to add timeout to sendMail operation
+async function sendMailWithTimeout(transporter: any, mailOptions: any, timeoutMs: number = 10000): Promise<void> {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('SMTP operation timeout')), timeoutMs);
+  });
+  
+  return Promise.race([
+    transporter.sendMail(mailOptions),
+    timeoutPromise
+  ]) as Promise<void>;
 }
 
 router.post('/signup', async (req, res, next) => {
@@ -49,13 +65,13 @@ router.post('/signup', async (req, res, next) => {
       try {
         const transporter = getTransporter();
         if (transporter) {
-          await transporter.sendMail({
+          await sendMailWithTimeout(transporter, {
             from: process.env.SMTP_USER,
             to: email,
             subject: 'Verify your account',
             text: `Click to verify: ${link}`,
             html: `<p>Click to verify: <a href="${link}">Verify</a></p>`
-          });
+          }, 10000); // 10 second timeout
         }
       } catch (smtpError: any) {
         console.error('SMTP error:', smtpError.message);
@@ -97,13 +113,13 @@ router.post('/forgot-password', async (req, res, next) => {
       try {
         const transporter = getTransporter();
         if (transporter) {
-          await transporter.sendMail({
+          await sendMailWithTimeout(transporter, {
             from: process.env.SMTP_USER,
             to: email,
             subject: 'Reset your password',
             text: `Click to reset: ${link}`,
             html: `<p>Click to reset: <a href="${link}">Reset Password</a></p>`
-          });
+          }, 10000); // 10 second timeout
         }
       } catch (smtpError: any) {
         console.error('SMTP error:', smtpError.message);

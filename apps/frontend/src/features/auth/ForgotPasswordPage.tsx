@@ -3,10 +3,13 @@ import { FormEvent, useState } from 'react';
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (loading) return; // Prevent multiple submissions
     setStatus(null);
+    setLoading(true);
     
     // Use Vite environment variables with fallback
     const baseUrl = (import.meta.env.VITE_BACKEND_URL || 
@@ -34,12 +37,14 @@ export default function ForgotPasswordPage() {
           const errorMsg = `Error ${res.status}: ${res.statusText || 'Server error'}`;
           console.error('Forgot password error:', errorMsg);
           setStatus(errorMsg);
+          setLoading(false);
           return;
         }
       }
       
       if (!res.ok) {
         setStatus(data.message || `Error ${res.status}: ${res.statusText || 'Request failed'}`);
+        setLoading(false);
         return;
       }
       
@@ -47,6 +52,8 @@ export default function ForgotPasswordPage() {
     } catch (err: any) {
       console.error('Network error:', err);
       setStatus(`Network error: ${err.message || 'Please check your connection and try again.'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,7 +78,17 @@ export default function ForgotPasswordPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input type="email" className="w-full border border-gray-300 rounded px-3 py-2" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded transition">Send reset link</button>
+          <button 
+            type="submit" 
+            disabled={loading}
+            className={`w-full text-white font-semibold py-2.5 rounded transition ${
+              loading 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {loading ? 'Sending...' : 'Send reset link'}
+          </button>
         </form>
       </div>
     </div>
