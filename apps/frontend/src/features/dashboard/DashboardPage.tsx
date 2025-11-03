@@ -233,9 +233,9 @@ export default function DashboardPage() {
 
   // Helper function to render performance view (metric summaries without slabs)
   const renderPerformanceView = (metrics: any[], totals: any, employeeVariablePay: number, periodType: 'day' | 'week') => {
-    // Separate AB and non-AB metrics for different period calculations
-    const abMetrics = metrics.filter(m => m.metric.includes('AB'));
-    const nonABMetrics = metrics.filter(m => !m.metric.includes('AB'));
+    // Separate AB/NOB (weekly-only) and non-AB/NOB metrics for different period calculations
+    const abMetrics = metrics.filter(m => m.metric.includes('AB') || m.metric.includes('NOB'));
+    const nonABMetrics = metrics.filter(m => !m.metric.includes('AB') && !m.metric.includes('NOB'));
     
     // Group metrics by name and aggregate across slabs
     const metricSummaries: Record<string, {
@@ -319,7 +319,9 @@ export default function DashboardPage() {
         else if (slabNum === 3) incentivePercent = 2;
       }
       
-      const potentialEarnings = nonABPeriodVariablePay * incentivePercent;
+      // Variable Pay should be split based on contribution % only
+      const contribution = metricSummaries[metricName].contribution || 0;
+      const potentialEarnings = nonABPeriodVariablePay * incentivePercent * contribution;
       
       // Track the maximum potential earnings across all slabs
       metricSummaries[metricName].maxPotentialEarnings = Math.max(
@@ -382,7 +384,9 @@ export default function DashboardPage() {
         else if (slabNum === 3) incentivePercent = 2;
       }
       
-      const potentialEarnings = abPeriodVariablePay * incentivePercent;
+      // Variable Pay should be split based on contribution % only
+      const contribution = metricSummaries[metricName].contribution || 0;
+      const potentialEarnings = abPeriodVariablePay * incentivePercent * contribution;
       
       // Track the maximum potential earnings across all slabs
       metricSummaries[metricName].maxPotentialEarnings = Math.max(
@@ -531,8 +535,8 @@ export default function DashboardPage() {
                        summary.metric === 'VegetablesAB' ? '🥬' : '📊'}
                     </span>
                     <span className="font-bold text-lg">{summary.metric}</span>
-                    {/* Weekly badge for AB metrics in Day view */}
-                    {summary.metric.includes('AB') && viewMode === 'day' && (
+                    {/* Weekly badge for AB/NOB metrics in Day view */}
+                    {(summary.metric.includes('AB') || summary.metric.includes('NOB')) && viewMode === 'day' && (
                       <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
                         currentTheme.isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
                       }`}>
@@ -1006,8 +1010,8 @@ export default function DashboardPage() {
                     // Function to filter metrics
                     const filterMetrics = (metrics: any[], period: 'day' | 'week') => {
                       if (period === 'day') {
-                        // For day view, exclude AB metrics (they're weekly-only)
-                        return metrics.filter(m => !m.metric.includes('AB'));
+                        // For day view, exclude AB/NOB metrics (they're weekly-only)
+                        return metrics.filter(m => !m.metric.includes('AB') && !m.metric.includes('NOB'));
                       }
                       return metrics; // Week view shows all metrics
                     };
@@ -1035,20 +1039,20 @@ export default function DashboardPage() {
                       };
                     };
 
-                    // Get AB metrics from weekly data
-                    const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB')) || [];
+                    // Get AB/NOB metrics from weekly data (weekly-only metrics)
+                    const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB') || m.metric.includes('NOB')) || [];
 
                     // Combine appropriately
                     const displayMetrics = viewMode === 'day'
                       ? [
                           ...filterMetrics(employeeDetails.daily?.metrics || [], 'day'),
-                          ...abMetrics // Always include AB metrics from weekly
+                          ...abMetrics // Always include AB/NOB metrics from weekly
                         ]
                       : (employeeDetails.weekly?.metrics || []);
 
                     const displayTotals = recalculateTotals(displayMetrics);
 
-                    // Show info message if Day view has AB metrics
+                    // Show info message if Day view has AB/NOB metrics
                     const hasABMetrics = viewMode === 'day' && abMetrics.length > 0;
 
                     return (
@@ -1065,7 +1069,7 @@ export default function DashboardPage() {
                               <span className={`text-sm ${
                                 currentTheme.isDark ? 'text-blue-300' : 'text-blue-700'
                     }`}>
-                                AB metrics are displayed at weekly level
+                                AB/NOB metrics are displayed at weekly level
                               </span>
                   </div>
                 </div>

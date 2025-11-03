@@ -20,10 +20,10 @@ export default function ForgotPasswordPage() {
     
     try {
       const res = await fetch(`${baseUrl}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
       
       let data: any = {};
       try {
@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
         return;
       }
       
-      setStatus(data.message || 'If the email exists, a reset link has been sent');
+    setStatus(data.message || 'If the email exists, a reset link has been sent');
     } catch (err: any) {
       console.error('Network error:', err);
       setStatus(`Network error: ${err.message || 'Please check your connection and try again.'}`);

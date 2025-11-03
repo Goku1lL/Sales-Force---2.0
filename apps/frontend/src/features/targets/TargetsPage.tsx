@@ -50,9 +50,9 @@ export default function TargetsPage() {
 
   // Helper function to render performance view with slab badges
   const renderPerformanceView = (metrics: any[], totals: any, employeeVariablePay: number, periodType: 'day' | 'week') => {
-    // Separate AB and non-AB metrics for different period calculations
-    const abMetrics = metrics.filter(m => m.metric.includes('AB'));
-    const nonABMetrics = metrics.filter(m => !m.metric.includes('AB'));
+    // Separate AB/NOB (weekly-only) and non-AB/NOB metrics for different period calculations
+    const abMetrics = metrics.filter(m => m.metric.includes('AB') || m.metric.includes('NOB'));
+    const nonABMetrics = metrics.filter(m => !m.metric.includes('AB') && !m.metric.includes('NOB'));
     
     // Convert monthly variable_pay to daily or weekly for non-AB metrics
     const nonABPeriodMultiplier = periodType === 'day' ? (1 / 30) : (1 / 4);
@@ -116,7 +116,9 @@ export default function TargetsPage() {
         else if (slabNum === 3) incentivePercent = 2;
       }
 
-      const potentialEarnings = nonABPeriodVariablePay * incentivePercent;
+      // Variable Pay should be split based on contribution % only
+      const contribution = Number(item.contribution || 0);
+      const potentialEarnings = nonABPeriodVariablePay * incentivePercent * contribution;
       const earnings = Number(item.earnings || 0);
       const pendingToEarn = Math.max(0, potentialEarnings - earnings);
 
@@ -191,7 +193,9 @@ export default function TargetsPage() {
         else if (slabNum === 3) incentivePercent = 2;
       }
 
-      const potentialEarnings = abPeriodVariablePay * incentivePercent;
+      // Variable Pay should be split based on contribution % only
+      const contribution = Number(item.contribution || 0);
+      const potentialEarnings = abPeriodVariablePay * incentivePercent * contribution;
       const earnings = Number(item.earnings || 0);
       const pendingToEarn = Math.max(0, potentialEarnings - earnings);
 
@@ -430,7 +434,7 @@ export default function TargetsPage() {
                           <h4 className="text-base font-bold text-gray-800 uppercase tracking-wide">
                             {summary.metric}
                           </h4>
-                          {summary.metric.includes('AB') && viewMode === 'day' && (
+                          {(summary.metric.includes('AB') || summary.metric.includes('NOB')) && viewMode === 'day' && (
                             <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
                               currentTheme.isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
                             }`}>
@@ -569,8 +573,8 @@ export default function TargetsPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-xl">{summary.metric}</span>
-                          {/* Weekly badge for AB metrics in Day view */}
-                          {summary.metric.includes('AB') && viewMode === 'day' && (
+                          {/* Weekly badge for AB/NOB metrics in Day view */}
+                          {(summary.metric.includes('AB') || summary.metric.includes('NOB')) && viewMode === 'day' && (
                             <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
                               currentTheme.isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
                             }`}>
@@ -1017,8 +1021,8 @@ export default function TargetsPage() {
             // Function to filter metrics
             const filterMetrics = (metrics: any[], period: 'day' | 'week') => {
               if (period === 'day') {
-                // For day view, exclude AB metrics (they're weekly-only)
-                return metrics.filter(m => !m.metric.includes('AB'));
+                // For day view, exclude AB/NOB metrics (they're weekly-only)
+                return metrics.filter(m => !m.metric.includes('AB') && !m.metric.includes('NOB'));
               }
               return metrics; // Week view shows all metrics
             };
@@ -1046,20 +1050,20 @@ export default function TargetsPage() {
               };
             };
 
-            // Get AB metrics from weekly data
-            const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB')) || [];
+            // Get AB/NOB metrics from weekly data (weekly-only metrics)
+            const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB') || m.metric.includes('NOB')) || [];
 
             // Combine appropriately
             const displayMetrics = viewMode === 'day'
               ? [
                   ...filterMetrics(employeeDetails.daily?.metrics || [], 'day'),
-                  ...abMetrics // Always include AB metrics from weekly
+                  ...abMetrics // Always include AB/NOB metrics from weekly
                 ]
               : (employeeDetails.weekly?.metrics || []);
 
             const displayTotals = recalculateTotals(displayMetrics);
 
-            // Show info message if Day view has AB metrics
+            // Show info message if Day view has AB/NOB metrics
             const hasABMetrics = viewMode === 'day' && abMetrics.length > 0;
 
             return (
@@ -1076,7 +1080,7 @@ export default function TargetsPage() {
                       <span className={`text-sm ${
                         currentTheme.isDark ? 'text-blue-300' : 'text-blue-700'
                       }`}>
-                        AB metrics are displayed at weekly level
+                        AB/NOB metrics are displayed at weekly level
                       </span>
                     </div>
                   </div>

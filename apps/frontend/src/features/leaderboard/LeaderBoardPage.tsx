@@ -29,14 +29,14 @@ function EmployeeDetailsCard({
     // Function to filter metrics
     const filterMetrics = (metrics: any[], period: 'day' | 'week') => {
       if (period === 'day') {
-        // For day view, exclude AB metrics (they're weekly-only)
-        return metrics.filter(m => !m.metric.includes('AB'));
+        // For day view, exclude AB/NOB metrics (they're weekly-only)
+        return metrics.filter(m => !m.metric.includes('AB') && !m.metric.includes('NOB'));
       }
       return metrics; // Week view shows all metrics
     };
 
-    // Get AB metrics from weekly data
-    const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB')) || [];
+    // Get AB/NOB metrics from weekly data (weekly-only metrics)
+    const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB') || m.metric.includes('NOB')) || [];
 
     // Combine appropriately
     const displayMetrics = localPeriod === 'day'
@@ -95,7 +95,7 @@ function EmployeeDetailsCard({
 
       {/* Info message for AB metrics in Day view */}
       {(() => {
-        const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB')) || [];
+        const abMetrics = employeeDetails.weekly?.metrics.filter(m => m.metric.includes('AB') || m.metric.includes('NOB')) || [];
         const hasABMetrics = localPeriod === 'day' && abMetrics.length > 0;
         
         return hasABMetrics ? (
@@ -103,7 +103,7 @@ function EmployeeDetailsCard({
             <div className="flex items-center gap-2">
               <span className="text-blue-500">ℹ️</span>
               <span className="text-sm text-blue-700">
-                AB metrics are displayed at weekly level
+                AB/NOB metrics are displayed at weekly level
               </span>
             </div>
           </div>
@@ -253,8 +253,8 @@ export default function LeaderBoardPage() {
             <div className="flex items-center gap-2">
               <span className="text-2xl">{getMetricEmoji(metricName)}</span>
               <span className="font-bold text-lg">{metricName}</span>
-              {/* Weekly badge for AB metrics in Day view */}
-              {metricName.includes('AB') && period === 'day' && (
+              {/* Weekly badge for AB/NOB metrics in Day view */}
+              {(metricName.includes('AB') || metricName.includes('NOB')) && period === 'day' && (
                 <span className="text-xs font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700">
                   Weekly
                 </span>

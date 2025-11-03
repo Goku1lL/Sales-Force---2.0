@@ -14,6 +14,92 @@ function getCurrentYearweek(date?: Date): string {
   return year + String(week).padStart(2, '0');
 }
 
+// Helper function to calculate weighted achievement percentage
+// For each metric: (achievement / max_target) * 100 * contribution
+// Returns: sum of all weighted percentages
+async function calculateWeightedAchievementPercentage(
+  prisma: any,
+  employeeId: string,
+  period: 'day' | 'week',
+  excludeAB: boolean = false
+): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+  const currentYearweek = getCurrentYearweek();
+
+  let achievementsRaw: any[];
+  let targetsRaw: any[];
+
+  if (period === 'day') {
+    // Get daily achievements grouped by metric
+    achievementsRaw = await prisma.$queryRawUnsafe(
+      `SELECT metric, SUM(Achievement) as achievement
+       FROM DayAchievement 
+       WHERE employee_id = ? AND date = ? AND deleted = 0
+       GROUP BY metric`,
+      employeeId, today
+    ) as any[];
+
+    // Get daily targets with max target per metric and contribution
+    targetsRaw = await prisma.$queryRawUnsafe(
+      `SELECT metric, MAX(target) as maxTarget, MAX(contribution) as contribution
+       FROM DayTargets
+       WHERE employee_id = ? AND date = ? AND deleted = 0
+       ${excludeAB ? "AND metric NOT LIKE '%AB%' AND metric NOT LIKE '%NOB%'" : ''}
+       GROUP BY metric`,
+      employeeId, today
+    ) as any[];
+  } else {
+    // Get weekly achievements grouped by metric
+    achievementsRaw = await prisma.$queryRawUnsafe(
+      `SELECT metric, SUM(Achievement) as achievement
+       FROM WeekAchievement 
+       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
+       GROUP BY metric`,
+      employeeId, currentYearweek
+    ) as any[];
+
+    // Get weekly targets with max target per metric and contribution
+    targetsRaw = await prisma.$queryRawUnsafe(
+      `SELECT metric, MAX(target) as maxTarget, MAX(contribution) as contribution
+       FROM WeekTargets
+       WHERE employee_id = ? AND yearweek = ? AND deleted = 0
+       ${excludeAB ? "AND metric NOT LIKE '%AB%' AND metric NOT LIKE '%NOB%'" : ''}
+       GROUP BY metric`,
+      employeeId, currentYearweek
+    ) as any[];
+  }
+
+  // Create lookup maps
+  const achievementMap = achievementsRaw.reduce((map: Record<string, number>, item) => {
+    map[item.metric] = Number(item.achievement || 0);
+    return map;
+  }, {});
+
+  const targetMap = targetsRaw.reduce((map: Record<string, { maxTarget: number; contribution: number }>, item) => {
+    map[item.metric] = {
+      maxTarget: Number(item.maxTarget || 0),
+      contribution: Number(item.contribution || 1)
+    };
+    return map;
+  }, {});
+
+  // Calculate weighted percentage for each metric and sum
+  let totalWeightedPercentage = 0;
+
+  Object.keys(targetMap).forEach(metric => {
+    const achievement = achievementMap[metric] || 0;
+    const { maxTarget, contribution } = targetMap[metric];
+
+    if (maxTarget > 0) {
+      const achievementPercentage = (achievement / maxTarget) * 100;
+      const weightedPercentage = achievementPercentage * contribution;
+      totalWeightedPercentage += weightedPercentage;
+    }
+  });
+
+  return totalWeightedPercentage;
+}
+
 // Get user profile with cluster, city and ranking info
 router.get('/profile/:employeeId', async (req, res, next) => {
   try {
@@ -118,57 +204,80 @@ router.get('/cluster/:cluster', async (req, res, next) => {
     const prisma = getPrisma();
 
         if (period === 'day') {
-          // Get cluster leaderboard based on daily achievements percentage
-          const rows = await prisma.$queryRawUnsafe<any[]>(
-            `SELECT @rank := @rank + 1 as rank, t.*
-             FROM (
-               SELECT
-                 e.employee_id,
-                 e.Name,
-                 e.cluster,
-                 COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as achievement,
-                 COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as target,
-                 CASE 
-                   WHEN COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) > 0 
-                   THEN (COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0)) * 100
-                   ELSE 0
-                 END as achievement_percentage
-               FROM Executive e
-               WHERE e.deleted = 0 AND e.cluster = ?
-               ORDER BY achievement_percentage DESC
-               LIMIT 100
-             ) t
-             CROSS JOIN (SELECT @rank := 0) r`,
+          // Get cluster leaderboard based on daily achievements percentage (weighted by contribution)
+          const employees = await prisma.$queryRawUnsafe<any[]>(
+            `SELECT e.employee_id, e.Name, e.cluster
+             FROM Executive e
+             WHERE e.deleted = 0 AND e.cluster = ?`,
             cluster
           );
+
+          // Calculate weighted achievement percentage for each employee
+          const leaderboardData = await Promise.all(
+            employees.map(async (emp: any) => {
+              const achievementPercentage = await calculateWeightedAchievementPercentage(
+                prisma,
+                emp.employee_id,
+                'day',
+                true // Exclude AB metrics in day view
+              );
+
+              return {
+                employee_id: emp.employee_id,
+                Name: emp.Name,
+                cluster: emp.cluster,
+                achievement: 0, // Not used in frontend, kept for compatibility
+                target: 0, // Not used in frontend, kept for compatibility
+                achievement_percentage: achievementPercentage
+              };
+            })
+          );
+
+          // Sort by achievement_percentage descending and assign ranks
+          leaderboardData.sort((a, b) => b.achievement_percentage - a.achievement_percentage);
+          const rows = leaderboardData.slice(0, 100).map((item, index) => ({
+            rank: index + 1,
+            ...item
+          }));
+
           res.json({ status: 'success', data: rows });
         } else {
-          // Calculate current yearweek from today's date
-          const currentYearweek = getCurrentYearweek();
-          
-          // Get cluster leaderboard based on weekly achievements percentage
-          const rows = await prisma.$queryRawUnsafe<any[]>(
-            `SELECT @rank := @rank + 1 as rank, t.*
-             FROM (
-               SELECT
-                 e.employee_id,
-                 e.Name,
-                 e.cluster,
-                 COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as achievement,
-                 COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as target,
-                 CASE 
-                   WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) > 0 
-                   THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0)) * 100
-                   ELSE 0
-                 END as achievement_percentage
-               FROM Executive e
-               WHERE e.deleted = 0 AND e.cluster = ?
-               ORDER BY achievement_percentage DESC
-               LIMIT 100
-             ) t
-             CROSS JOIN (SELECT @rank := 0) r`,
-            currentYearweek, currentYearweek, currentYearweek, currentYearweek, currentYearweek, cluster
+          // Get cluster leaderboard based on weekly achievements percentage (weighted by contribution)
+          const employees = await prisma.$queryRawUnsafe<any[]>(
+            `SELECT e.employee_id, e.Name, e.cluster
+             FROM Executive e
+             WHERE e.deleted = 0 AND e.cluster = ?`,
+            cluster
           );
+
+          // Calculate weighted achievement percentage for each employee
+          const leaderboardData = await Promise.all(
+            employees.map(async (emp: any) => {
+              const achievementPercentage = await calculateWeightedAchievementPercentage(
+                prisma,
+                emp.employee_id,
+                'week',
+                false // Include AB metrics in week view
+              );
+
+              return {
+                employee_id: emp.employee_id,
+                Name: emp.Name,
+                cluster: emp.cluster,
+                achievement: 0, // Not used in frontend, kept for compatibility
+                target: 0, // Not used in frontend, kept for compatibility
+                achievement_percentage: achievementPercentage
+              };
+            })
+          );
+
+          // Sort by achievement_percentage descending and assign ranks
+          leaderboardData.sort((a, b) => b.achievement_percentage - a.achievement_percentage);
+          const rows = leaderboardData.slice(0, 100).map((item, index) => ({
+            rank: index + 1,
+            ...item
+          }));
+
           res.json({ status: 'success', data: rows });
         }
   } catch (err) { next(err); }
@@ -181,61 +290,84 @@ router.get('/city/:cityId', authMiddleware, async (req, res, next) => {
     const prisma = getPrisma();
     
     if (period === 'day') {
-      // Get city leaderboard based on daily achievements percentage
-      const rows = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT @rank := @rank + 1 as rank, t.*
-         FROM (
-           SELECT
-             e.employee_id,
-             e.Name,
-             e.CityId,
-             cd.City as city_name,
-             COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as achievement,
-             COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) as target,
-             CASE 
-               WHEN COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) > 0 
-               THEN (COALESCE((SELECT SUM(Achievement) FROM DayAchievement WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM DayTargets WHERE employee_id = e.employee_id AND date = CURDATE() AND deleted = 0), 0)) * 100
-               ELSE 0
-             END as achievement_percentage
-           FROM Executive e
-           LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
-           WHERE e.deleted = 0 AND e.CityId = ?
-           ORDER BY achievement_percentage DESC
-           LIMIT 100
-         ) t
-         CROSS JOIN (SELECT @rank := 0) r`,
+      // Get city leaderboard based on daily achievements percentage (weighted by contribution)
+      const employees = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT e.employee_id, e.Name, e.CityId, cd.City as city_name
+         FROM Executive e
+         LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
+         WHERE e.deleted = 0 AND e.CityId = ?`,
         cityId
       );
+
+      // Calculate weighted achievement percentage for each employee
+      const leaderboardData = await Promise.all(
+        employees.map(async (emp: any) => {
+          const achievementPercentage = await calculateWeightedAchievementPercentage(
+            prisma,
+            emp.employee_id,
+            'day',
+            true // Exclude AB metrics in day view
+          );
+
+          return {
+            employee_id: emp.employee_id,
+            Name: emp.Name,
+            CityId: emp.CityId,
+            city_name: emp.city_name,
+            achievement: 0, // Not used in frontend, kept for compatibility
+            target: 0, // Not used in frontend, kept for compatibility
+            achievement_percentage: achievementPercentage
+          };
+        })
+      );
+
+      // Sort by achievement_percentage descending and assign ranks
+      leaderboardData.sort((a, b) => b.achievement_percentage - a.achievement_percentage);
+      const rows = leaderboardData.slice(0, 100).map((item, index) => ({
+        rank: index + 1,
+        ...item
+      }));
+
       res.json({ status: 'success', data: rows });
     } else {
-      // Calculate current yearweek from today's date
-      const currentYearweek = getCurrentYearweek();
-      
-      // Get city leaderboard based on weekly achievements percentage
-      const rows = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT @rank := @rank + 1 as rank, t.*
-         FROM (
-           SELECT
-             e.employee_id,
-             e.Name,
-             e.CityId,
-             cd.City as city_name,
-             COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as achievement,
-             COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) as target,
-             CASE 
-               WHEN COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) > 0 
-               THEN (COALESCE((SELECT SUM(Achievement) FROM WeekAchievement WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0) / COALESCE((SELECT MAX(target) FROM WeekTargets WHERE employee_id = e.employee_id AND yearweek = ? AND deleted = 0), 0)) * 100
-               ELSE 0
-             END as achievement_percentage
-           FROM Executive e
-           LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
-           WHERE e.deleted = 0 AND e.CityId = ?
-           ORDER BY achievement_percentage DESC
-           LIMIT 100
-         ) t
-         CROSS JOIN (SELECT @rank := 0) r`,
-        currentYearweek, currentYearweek, currentYearweek, currentYearweek, currentYearweek, cityId
+      // Get city leaderboard based on weekly achievements percentage (weighted by contribution)
+      const employees = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT e.employee_id, e.Name, e.CityId, cd.City as city_name
+         FROM Executive e
+         LEFT JOIN City_Dim cd ON e.CityId = cd.CityId
+         WHERE e.deleted = 0 AND e.CityId = ?`,
+        cityId
       );
+
+      // Calculate weighted achievement percentage for each employee
+      const leaderboardData = await Promise.all(
+        employees.map(async (emp: any) => {
+          const achievementPercentage = await calculateWeightedAchievementPercentage(
+            prisma,
+            emp.employee_id,
+            'week',
+            false // Include AB metrics in week view
+          );
+
+          return {
+            employee_id: emp.employee_id,
+            Name: emp.Name,
+            CityId: emp.CityId,
+            city_name: emp.city_name,
+            achievement: 0, // Not used in frontend, kept for compatibility
+            target: 0, // Not used in frontend, kept for compatibility
+            achievement_percentage: achievementPercentage
+          };
+        })
+      );
+
+      // Sort by achievement_percentage descending and assign ranks
+      leaderboardData.sort((a, b) => b.achievement_percentage - a.achievement_percentage);
+      const rows = leaderboardData.slice(0, 100).map((item, index) => ({
+        rank: index + 1,
+        ...item
+      }));
+
       res.json({ status: 'success', data: rows });
     }
   } catch (err) { next(err); }
