@@ -474,28 +474,33 @@ router.get('/employee-details/:employeeId', async (req, res, next) => {
     const today = new Date().toISOString().slice(0, 10);
     
     // Get achievements separately (grouped by metric to avoid duplication)
+    // Exclude AB and NOB metrics (they're weekly-only)
     const dailyAchievementsRaw = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, SUM(Achievement) as achievement, SUM(variable_pay) as achievement_earnings
        FROM DayAchievement 
        WHERE employee_id = ? AND date = ? AND deleted = 0
+       AND metric NOT LIKE '%AB%' AND metric NOT LIKE '%NOB%'
        GROUP BY metric`,
       employeeId, today
     );
 
     // Get targets with all slabs
+    // Exclude AB and NOB metrics (they're weekly-only)
     const dailyTargets = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, target, incentive_percent, slab_Segment, contribution
        FROM DayTargets
        WHERE employee_id = ? AND date = ? AND deleted = 0
+       AND metric NOT LIKE '%AB%' AND metric NOT LIKE '%NOB%'
        ORDER BY metric, slab_Segment`,
       employeeId, today
     );
 
-    // Get eligibility metric for daily period
+    // Get eligibility metric for daily period (exclude AB and NOB metrics)
     const dailyEligibilityMetric = await prisma.$queryRawUnsafe<any[]>(
       `SELECT metric, MAX(target) as maxTarget
        FROM DayTargets
        WHERE employee_id = ? AND date = ? AND eligibility = 1 AND deleted = 0
+       AND metric NOT LIKE '%AB%' AND metric NOT LIKE '%NOB%'
        GROUP BY metric
        LIMIT 1`,
       employeeId, today
