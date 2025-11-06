@@ -2245,6 +2245,7 @@ model CustomerSegment {
   CityId     BigInt
   CustomerId BigInt
   Segment    String? @db.VarChar(200)
+  SubSegment String? @db.VarChar(400)
 
   @@id([CityId, CustomerId])
   @@index([CityId], map: "CS_CityId_IDX")
@@ -2746,42 +2747,46 @@ model DayAchievement_History {
 }
 
 model DayTargets {
-  Id              BigInt    @id @default(autoincrement())
-  employee_id     String?   @db.VarChar(400)
-  date            DateTime? @db.Date
-  metric          String?   @db.VarChar(400)
-  unit            String?   @db.VarChar(400)
-  target          Decimal?  @db.Decimal(10, 2)
-  slab_Segment    String?   @db.VarChar(400)
-  contribution    Decimal?  @db.Decimal(10, 2)
-  variable_pay    Decimal?  @db.Decimal(10, 2)
-  daycontribution Decimal?  @db.Decimal(10, 2)
-  created_at      DateTime? @default(now()) @db.Timestamp(0)
-  updated_at      DateTime? @default(now()) @db.Timestamp(0)
-  created_by      BigInt?
-  updated_by      BigInt?
-  deleted         Boolean?  @default(false)
+  Id                BigInt    @id @default(autoincrement())
+  employee_id       String?   @db.VarChar(400)
+  date              DateTime? @db.Date
+  metric            String?   @db.VarChar(400)
+  unit              String?   @db.VarChar(400)
+  target            Decimal?  @db.Decimal(10, 2)
+  slab_Segment      String?   @db.VarChar(400)
+  contribution      Decimal?  @db.Decimal(10, 2)
+  variable_pay      Decimal?  @db.Decimal(10, 2)
+  daycontribution   Decimal?  @db.Decimal(10, 2)
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @db.Timestamp(0)
+  created_by        BigInt?
+  updated_by        BigInt?
+  deleted           Boolean?  @default(false)
+  incentive_percent Float?    @db.Float
+  eligibility       Float?    @db.Float
 
   @@index([date], map: "date_idx")
   @@index([employee_id], map: "employee_id_idx")
 }
 
 model DayTargets_History {
-  Id              BigInt    @id @default(autoincrement())
-  employee_id     String?   @db.VarChar(400)
-  date            DateTime? @db.Date
-  metric          String?   @db.VarChar(400)
-  unit            String?   @db.VarChar(400)
-  target          Decimal?  @db.Decimal(10, 2)
-  slab_Segment    String?   @db.VarChar(400)
-  contribution    Decimal?  @db.Decimal(10, 2)
-  variable_pay    Decimal?  @db.Decimal(10, 2)
-  daycontribution Decimal?  @db.Decimal(10, 2)
-  created_at      DateTime? @default(now()) @db.Timestamp(0)
-  updated_at      DateTime? @default(now()) @db.Timestamp(0)
-  created_by      BigInt?
-  updated_by      BigInt?
-  deleted         Boolean?  @default(false)
+  Id                BigInt    @id @default(autoincrement())
+  employee_id       String?   @db.VarChar(400)
+  date              DateTime? @db.Date
+  metric            String?   @db.VarChar(400)
+  unit              String?   @db.VarChar(400)
+  target            Decimal?  @db.Decimal(10, 2)
+  slab_Segment      String?   @db.VarChar(400)
+  contribution      Decimal?  @db.Decimal(10, 2)
+  variable_pay      Decimal?  @db.Decimal(10, 2)
+  daycontribution   Decimal?  @db.Decimal(10, 2)
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @db.Timestamp(0)
+  created_by        BigInt?
+  updated_by        BigInt?
+  deleted           Boolean?  @default(false)
+  incentive_percent Float?    @db.Float
+  eligibility       Float?    @db.Float
 
   @@index([date], map: "date_idx")
   @@index([employee_id], map: "employee_id_idx")
@@ -22242,19 +22247,27 @@ model Labour_S_int {
 }
 
 model LeaderBoard {
-  Id          BigInt  @id @default(autoincrement())
-  employee_id String? @db.VarChar(400)
-  day_segment String? @db.VarChar(400)
-  layer       String? @db.VarChar(400)
+  Id          BigInt    @id @default(autoincrement())
+  employee_id String?   @db.VarChar(400)
+  day_segment String?   @db.VarChar(400)
+  layer       String?   @db.VarChar(400)
   Ranking     BigInt?
+  date        DateTime? @db.Date
+  yearweek    BigInt?
+  Achievement Float?    @db.Float
+  layer_value String?   @db.VarChar(400)
 }
 
 model LeaderBoard_History {
-  Id          BigInt  @id @default(autoincrement())
-  employee_id String? @db.VarChar(400)
-  day_segment String? @db.VarChar(400)
-  layer       String? @db.VarChar(400)
+  Id          BigInt    @id @default(autoincrement())
+  employee_id String?   @db.VarChar(400)
+  day_segment String?   @db.VarChar(400)
+  layer       String?   @db.VarChar(400)
   Ranking     BigInt?
+  date        DateTime? @db.Date
+  yearweek    BigInt?
+  Achievement Float?    @db.Float
+  layer_value String?   @db.VarChar(400)
 }
 
 model Liquidation_B {
@@ -25324,40 +25337,46 @@ model WeekAchievement_History {
 }
 
 model WeekTargets {
-  Id           BigInt    @id @default(autoincrement())
-  employee_id  String?   @db.VarChar(400)
-  yearweek     BigInt?
-  metric       String?   @db.VarChar(400)
-  unit         String?   @db.VarChar(400)
-  target       Decimal?  @db.Decimal(10, 2)
-  slab_Segment String?   @db.VarChar(400)
-  contribution Decimal?  @db.Decimal(10, 2)
-  variable_pay Decimal?  @db.Decimal(10, 2)
-  created_at   DateTime? @default(now()) @db.Timestamp(0)
-  updated_at   DateTime? @default(now()) @db.Timestamp(0)
-  created_by   BigInt?
-  updated_by   BigInt?
-  deleted      Boolean?  @default(false)
+  Id                BigInt    @id @default(autoincrement())
+  employee_id       String?   @db.VarChar(400)
+  yearweek          BigInt?
+  metric            String?   @db.VarChar(400)
+  unit              String?   @db.VarChar(400)
+  target            Decimal?  @db.Decimal(10, 2)
+  slab_Segment      String?   @db.VarChar(400)
+  contribution      Decimal?  @db.Decimal(10, 2)
+  variable_pay      Decimal?  @db.Decimal(10, 2)
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @db.Timestamp(0)
+  created_by        BigInt?
+  updated_by        BigInt?
+  deleted           Boolean?  @default(false)
+  incentive_percent Float?    @db.Float
+  eligibility       Float?    @db.Float
+  daycontribution   Float?    @db.Float
 
   @@index([employee_id], map: "employee_id_idx")
   @@index([yearweek], map: "yearweek_idx")
 }
 
 model WeekTargets_History {
-  Id           BigInt    @id @default(autoincrement())
-  employee_id  String?   @db.VarChar(400)
-  yearweek     BigInt?
-  metric       String?   @db.VarChar(400)
-  unit         String?   @db.VarChar(400)
-  target       Decimal?  @db.Decimal(10, 2)
-  slab_Segment String?   @db.VarChar(400)
-  contribution Decimal?  @db.Decimal(10, 2)
-  variable_pay Decimal?  @db.Decimal(10, 2)
-  created_at   DateTime? @default(now()) @db.Timestamp(0)
-  updated_at   DateTime? @default(now()) @db.Timestamp(0)
-  created_by   BigInt?
-  updated_by   BigInt?
-  deleted      Boolean?  @default(false)
+  Id                BigInt    @id @default(autoincrement())
+  employee_id       String?   @db.VarChar(400)
+  yearweek          BigInt?
+  metric            String?   @db.VarChar(400)
+  unit              String?   @db.VarChar(400)
+  target            Decimal?  @db.Decimal(10, 2)
+  slab_Segment      String?   @db.VarChar(400)
+  contribution      Decimal?  @db.Decimal(10, 2)
+  variable_pay      Decimal?  @db.Decimal(10, 2)
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @db.Timestamp(0)
+  created_by        BigInt?
+  updated_by        BigInt?
+  deleted           Boolean?  @default(false)
+  incentive_percent Float?    @db.Float
+  eligibility       Float?    @db.Float
+  daycontribution   Float?    @db.Float
 
   @@index([employee_id], map: "employee_id_idx")
   @@index([yearweek], map: "yearweek_idx")
@@ -25544,6 +25563,292 @@ model interfacilitypofnv_int {
   @@index([SaleorderId], map: "interfacilitypo_fnv_SaleorderId_IDX")
   @@index([cityid], map: "interfacilitypo_fnv_cityid_IDX")
   @@index([skuid], map: "interfacilitypo_fnv_skuid_IDX")
+}
+
+model SAP_incoming_Payments_knockoff_all_database {
+  id                       Int       @id
+  pr_id                    Int?
+  PaymentDate              DateTime? @db.Date
+  currencycode             String?   @db.VarChar(25)
+  forexrate                Float?
+  paymentsubtype           String?   @db.VarChar(255)
+  CashSum                  Float?
+  SumApplied               Float?
+  Invoiceid                Int?
+  customerorganizationid   String?   @db.VarChar(255)
+  customerorganizationname String?   @db.VarChar(255)
+  vendororganizationid     String?   @db.VarChar(255)
+  vendororganizationname   String?   @db.VarChar(255)
+  businessunit             String?   @db.VarChar(255)
+  businessunitid           String?   @db.VarChar(255)
+  branch                   String?   @db.VarChar(255)
+  branchid                 String?   @db.VarChar(255)
+  updatedat                DateTime? @db.DateTime(0)
+  accountid                Int?
+  Remarks                  String?   @db.VarChar(255)
+  U_InvoiceNumber          String?   @db.VarChar(255)
+  U_TransactionId          String?   @db.VarChar(255)
+  CashAccount              String?   @db.VarChar(255)
+  DocDate                  DateTime? @db.Date
+  TaxDate                  DateTime? @db.Date
+  DueDate                  DateTime? @db.Date
+  TransferDate             DateTime? @db.Date
+  TransferAccount          String?   @db.VarChar(255)
+  TransferSum              Float?
+  CardCode                 String?   @db.VarChar(255)
+  Branch_ID                Int?
+  InvoiceRefNo             String?   @db.VarChar(255)
+  DocNum                   String?   @db.VarChar(255)
+  DocEntry                 String?   @db.VarChar(255)
+  U_IK_TRANSID             String?   @db.VarChar(255)
+  knockoff_date            DateTime? @db.Date
+  pr_U_IK_TRANSID          String?   @db.VarChar(50)
+  pr_DocNum                Int?
+  pr_DocEntry              Int?
+}
+
+model SAP_outgoing_Payments_knockoff_all_database {
+  id                       Int       @id
+  pm_id                    Int?
+  PaymentDate              DateTime? @db.Date
+  currencycode             String?   @db.VarChar(25)
+  forexrate                Float?
+  paymentsubtype           String?   @db.VarChar(255)
+  CashSum                  Float?
+  SumApplied               Float?
+  TransferSum              Float?
+  Billid                   Int?
+  U_InvoiceNumber          String?   @db.VarChar(255)
+  customerorganizationid   String?   @db.VarChar(255)
+  customerorganizationname String?   @db.VarChar(255)
+  vendororganizationid     String?   @db.VarChar(255)
+  vendororganizationname   String?   @db.VarChar(255)
+  businessunit             String?   @db.VarChar(255)
+  businessunitid           String?   @db.VarChar(255)
+  branch                   String?   @db.VarChar(255)
+  branchid                 String?   @db.VarChar(255)
+  updatedat                DateTime? @db.DateTime(0)
+  accountid                Int?
+  CashAccount              String?   @db.VarChar(255)
+  Remarks                  String?   @db.VarChar(255)
+  U_TransactionId          String?   @db.VarChar(255)
+  TransferAccount          String?   @db.VarChar(255)
+  DocDate                  DateTime? @db.Date
+  TaxDate                  DateTime? @db.Date
+  DueDate                  DateTime? @db.Date
+  TransferDate             DateTime? @db.Date
+  CardCode                 String?   @db.VarChar(255)
+  Branch_ID                Int?
+  InvoiceRefNo             String?   @db.VarChar(255)
+  DocNum                   String?   @db.VarChar(255)
+  DocEntry                 String?   @db.VarChar(255)
+  U_IK_TRANSID             String?   @db.VarChar(255)
+  knockoff_date            DateTime? @db.Date
+  pm_U_IK_TRANSID          String?   @db.VarChar(50)
+  pm_DocNum                Int?
+  pm_DocEntry              Int?
+}
+
+model SA_AppEvents {
+  Id          BigInt    @id @default(autoincrement())
+  entry_date  DateTime? @db.Date
+  entry_time  DateTime? @db.Time(0)
+  employee_id String?   @db.VarChar(400)
+  event_name  String?   @db.VarChar(400)
+  meta_data   Json?
+
+  @@index([employee_id], map: "employee_id_IDX")
+  @@index([entry_date], map: "entry_date_IDX")
+}
+
+model SA_Bonus {
+  Id            BigInt    @id @default(autoincrement())
+  metric        String?   @db.VarChar(400)
+  unit          String?   @db.VarChar(400)
+  steps         String?   @db.VarChar(400)
+  target        Float?    @db.Float
+  bonus_percent Float?    @db.Float
+  start_rank    BigInt?
+  end_rank      BigInt?
+  description   String?   @db.VarChar(1000)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  updated_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_by    BigInt?
+  updated_by    BigInt?
+  deleted       Boolean?  @default(false)
+  steps_value   String?   @db.VarChar(400)
+}
+
+model SA_Bonus_History {
+  Id            BigInt    @id @default(autoincrement())
+  sa_bonusid    BigInt?
+  metric        String?   @db.VarChar(400)
+  unit          String?   @db.VarChar(400)
+  steps         String?   @db.VarChar(400)
+  target        Float?    @db.Float
+  bonus_percent Float?    @db.Float
+  start_rank    BigInt?
+  end_rank      BigInt?
+  description   String?   @db.VarChar(1000)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  updated_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_by    BigInt?
+  updated_by    BigInt?
+  deleted       Boolean?  @default(false)
+  steps_value   String?   @db.VarChar(400)
+}
+
+model SA_Bounus_History {
+  Id            BigInt    @id @default(autoincrement())
+  metric        String?   @db.VarChar(400)
+  unit          String?   @db.VarChar(400)
+  steps         String?   @db.VarChar(400)
+  target        Float?    @db.Float
+  bonus_percent Float?    @db.Float
+  start_rank    BigInt?
+  end_rank      BigInt?
+  description   String?   @db.VarChar(1000)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  updated_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_by    BigInt?
+  updated_by    BigInt?
+  deleted       Boolean?  @default(false)
+  steps_value   String?   @db.VarChar(400)
+}
+
+model SA_CustomerSegment {
+  Id          BigInt   @id @default(autoincrement())
+  metric      String?  @db.VarChar(400)
+  description String?  @db.VarChar(400)
+  toinclude   Boolean?
+  customerid  BigInt?
+  deleted     Boolean? @default(false)
+}
+
+model SA_EmployeeBonus {
+  Id                BigInt    @id @default(autoincrement())
+  metric            String?   @db.VarChar(400)
+  employee_id       String?   @db.VarChar(400)
+  steps             String?   @db.VarChar(400)
+  steps_value       String?   @db.VarChar(400)
+  rank              BigInt?
+  bonus_achievement Float?    @db.Float
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @db.Timestamp(0)
+  created_by        BigInt?
+  updated_by        BigInt?
+  deleted           Boolean?  @default(false)
+}
+
+model SA_EmployeeBonus_History {
+  Id                 BigInt    @id @default(autoincrement())
+  sa_employeebonusid BigInt?
+  metric             String?   @db.VarChar(400)
+  employee_id        String?   @db.VarChar(400)
+  steps              String?   @db.VarChar(400)
+  steps_value        String?   @db.VarChar(400)
+  rank               BigInt?
+  bonus_achievement  Float?    @db.Float
+  created_at         DateTime? @default(now()) @db.Timestamp(0)
+  updated_at         DateTime? @default(now()) @db.Timestamp(0)
+  created_by         BigInt?
+  updated_by         BigInt?
+  deleted            Boolean?  @default(false)
+}
+
+model SA_ExecutiveAppEvents {
+  Id          BigInt    @id @default(autoincrement())
+  entry_date  DateTime? @db.Date
+  entry_time  DateTime? @db.Time(0)
+  employee_id String?   @db.VarChar(400)
+  event_name  String?   @db.VarChar(400)
+  meta_data   Json?
+
+  @@index([employee_id], map: "employee_id_IDX")
+  @@index([entry_date], map: "entry_date_IDX")
+}
+
+model SA_HomePageAppFunnelCustomers {
+  Id            BigInt  @id @default(autoincrement())
+  employee_id   String? @db.VarChar(400)
+  customer_id   BigInt?
+  customername  String? @db.VarChar(400)
+  contactnumber BigInt?
+  LastOpened    Float?  @db.Float
+  description   String? @db.VarChar(400)
+  Priority      BigInt?
+}
+
+model SA_HomePageAppFunnelCustomers_History {
+  Id            BigInt    @id @default(autoincrement())
+  date          DateTime? @db.Date
+  employee_id   String?   @db.VarChar(400)
+  customer_id   BigInt?
+  customername  String?   @db.VarChar(400)
+  contactnumber BigInt?
+  LastOpened    Float?    @db.Float
+  description   String?   @db.VarChar(400)
+  Priority      BigInt?
+}
+
+model SA_HomePageTargetCustomers {
+  Id            BigInt    @id @default(autoincrement())
+  employee_id   String?   @db.VarChar(400)
+  customer_id   BigInt?
+  customername  String?   @db.VarChar(400)
+  contactnumber BigInt?
+  LastOrder     BigInt?
+  description   String?   @db.VarChar(400)
+  Priority      BigInt?
+  updated_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  deleted       Boolean?  @default(false)
+}
+
+model SA_HomePageTargetCustomers_History {
+  Id            BigInt    @id @default(autoincrement())
+  date          DateTime? @db.Date
+  employee_id   String?   @db.VarChar(400)
+  customer_id   BigInt?
+  customername  String?   @db.VarChar(400)
+  contactnumber BigInt?
+  LastOrder     BigInt?
+  description   String?   @db.VarChar(400)
+  Priority      BigInt?
+  updated_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  deleted       Boolean?  @default(false)
+}
+
+model SA_TargetPageCustomers {
+  Id            BigInt    @id @default(autoincrement())
+  metric        String?   @db.VarChar(400)
+  employee_id   String?   @db.VarChar(400)
+  customer_id   BigInt?
+  customername  String?   @db.VarChar(400)
+  contactnumber BigInt?
+  LastOrder     BigInt?
+  description   String?   @db.VarChar(400)
+  Priority      BigInt?
+  updated_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  deleted       Boolean?  @default(false)
+}
+
+model SA_TargetPageCustomers_History {
+  Id            BigInt    @id @default(autoincrement())
+  metric        String?   @db.VarChar(400)
+  date          DateTime? @db.Date
+  employee_id   String?   @db.VarChar(400)
+  customer_id   BigInt?
+  customername  String?   @db.VarChar(400)
+  contactnumber BigInt?
+  LastOrder     BigInt?
+  description   String?   @db.VarChar(400)
+  Priority      BigInt?
+  updated_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  deleted       Boolean?  @default(false)
 }
 
 enum AbacusDashboardToWarehouseConfig_schema {

@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { eventTracker } from '../../services/eventTracker';
 
 interface UserInfo {
   id: number;
@@ -43,6 +44,12 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.refreshToken = action.payload.refreshToken ?? null;
       state.user = action.payload.user;
+      
+      // Initialize event tracking with employee ID
+      if (state.user?.employee_id) {
+        eventTracker.setEmployee(state.user.employee_id);
+      }
+      
       try {
         localStorage.setItem(
           AUTH_STORAGE_KEY,
@@ -51,6 +58,14 @@ const authSlice = createSlice({
       } catch {}
     },
     logout: (state) => {
+      // Track logout event before clearing employee ID
+      eventTracker.track('user_logout', {
+        employee_id: state.user?.employee_id
+      });
+      
+      // Clear event tracking
+      eventTracker.clearEmployee();
+      
       state.token = null;
       state.refreshToken = null;
       state.user = null;

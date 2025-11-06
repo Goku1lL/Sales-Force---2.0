@@ -10,6 +10,7 @@ import { CustomerCard } from '../customers/CustomerCard';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemedCard, ThemedBadge, ThemedProgress } from '../../shared';
 import { useLiveActivity } from '../../shared/useLiveActivity';
+import { usePageView, useEventTracking } from '../../hooks/useEventTracking';
 
 // Clean Progress Component - Single Responsibility
 function Progress({ value, color = 'green' }: { value: number; color?: 'green' | 'orange' | 'blue' | 'purple' }) {
@@ -151,6 +152,10 @@ export default function DashboardPage() {
   const [leaderboardType, setLeaderboardType] = useState<'cluster' | 'city'>('cluster');
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [leaderboardViewMode, setLeaderboardViewMode] = useState<'day' | 'week'>('day');
+  
+  // Event tracking
+  usePageView('dashboard');
+  const { track } = useEventTracking();
   // Redux state
   const { user } = useSelector((state: RootState) => state.auth);
   
@@ -954,7 +959,10 @@ export default function DashboardPage() {
                     {/* Day/Week Toggle */}
                     <div className="flex gap-1 sm:gap-2">
                       <button
-                        onClick={() => setViewMode('day')}
+                        onClick={() => {
+                          track('period_toggled', { from: viewMode, to: 'day', page: 'dashboard' });
+                          setViewMode('day');
+                        }}
                         className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-semibold transition-all ${
                           viewMode === 'day'
                             ? 'bg-purple-500 text-white shadow-lg'
@@ -966,7 +974,10 @@ export default function DashboardPage() {
                         DAY
                       </button>
                       <button
-                        onClick={() => setViewMode('week')}
+                        onClick={() => {
+                          track('period_toggled', { from: viewMode, to: 'week', page: 'dashboard' });
+                          setViewMode('week');
+                        }}
                         className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-semibold transition-all ${
                           viewMode === 'week'
                             ? 'bg-purple-500 text-white shadow-lg'

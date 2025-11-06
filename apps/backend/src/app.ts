@@ -9,6 +9,7 @@ import leaderboardRouter from './routes/leaderboard';
 import customersRouter from './routes/customers';
 import incentivesRouter from './routes/incentives';
 import achievementsRouter from './routes/achievements';
+import eventsRouter from './routes/events';
 import healthRouter from './routes/health';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimit } from './middleware/rateLimit';
@@ -38,6 +39,7 @@ app.use('/api/v1/leaderboard', leaderboardRouter);
 app.use('/api/v1/customers', customersRouter);
 app.use('/api/v1/incentives', incentivesRouter);
 app.use('/api/v1/achievements', achievementsRouter);
+app.use('/api/v1/events', eventsRouter);
 
 // Error handler
 app.use(errorHandler);

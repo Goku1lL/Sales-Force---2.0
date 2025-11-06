@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery, useGetUserProfileQuery, useGetEmployeeDetailsQuery } from './leaderboardApi';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
+import { usePageView, useEventTracking } from '../../hooks/useEventTracking';
 
 function EmployeeDetailsCard({ 
   employeeDetails, 
@@ -124,6 +125,10 @@ export default function LeaderBoardPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const { user, token } = useSelector((s: RootState) => s.auth);
   const employeeId = user?.employee_id;
+  
+  // Event tracking
+  usePageView('leaderboard');
+  const { track } = useEventTracking();
 
   // Don't render anything if user is not authenticated
   if (!token || !employeeId) {
@@ -309,7 +314,10 @@ export default function LeaderBoardPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex space-x-1">
           <button
-            onClick={() => setActiveTab('cluster')}
+            onClick={() => {
+              track('tab_switch', { from_tab: activeTab, to_tab: 'cluster', page: 'leaderboard' });
+              setActiveTab('cluster');
+            }}
             className={`px-4 py-2 rounded-lg font-medium ${
               activeTab === 'cluster'
                 ? 'bg-blue-600 text-white'
@@ -319,7 +327,10 @@ export default function LeaderBoardPage() {
             Cluster
           </button>
           <button
-            onClick={() => setActiveTab('city')}
+            onClick={() => {
+              track('tab_switch', { from_tab: activeTab, to_tab: 'city', page: 'leaderboard' });
+              setActiveTab('city');
+            }}
             className={`px-4 py-2 rounded-lg font-medium ${
               activeTab === 'city'
                 ? 'bg-blue-600 text-white'
@@ -333,7 +344,10 @@ export default function LeaderBoardPage() {
           {/* Period Toggle */}
           <div className="flex gap-2">
             <button
-              onClick={() => setPeriod('day')}
+              onClick={() => {
+                track('period_toggled', { from: period, to: 'day', page: 'leaderboard' });
+                setPeriod('day');
+              }}
               className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                 period === 'day'
                   ? 'bg-purple-500 text-white shadow-lg'
@@ -343,7 +357,10 @@ export default function LeaderBoardPage() {
               DAY
             </button>
             <button
-              onClick={() => setPeriod('week')}
+              onClick={() => {
+                track('period_toggled', { from: period, to: 'week', page: 'leaderboard' });
+                setPeriod('week');
+              }}
               className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                 period === 'week'
                   ? 'bg-purple-500 text-white shadow-lg'

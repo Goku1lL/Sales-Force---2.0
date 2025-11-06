@@ -3,12 +3,17 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
 import { useGetEmployeeDetailsQuery } from '../leaderboard/leaderboardApi';
 import { useTheme } from '../../shared/ThemeContext';
+import { usePageView, useEventTracking } from '../../hooks/useEventTracking';
 
 export default function TargetsPage() {
   const { currentTheme } = useTheme();
   const { user, token } = useSelector((s: RootState) => s.auth);
   const employeeId = user?.employee_id;
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  
+  // Event tracking
+  usePageView('targets');
+  const { track } = useEventTracking();
 
   // Don't render anything if user is not authenticated
   if (!token || !employeeId) {
@@ -990,7 +995,10 @@ export default function TargetsPage() {
             {/* Day/Week Toggle */}
             <div className="flex gap-2">
               <button
-                onClick={() => setViewMode('day')}
+                onClick={() => {
+                  track('period_toggled', { from: viewMode, to: 'day', page: 'targets' });
+                  setViewMode('day');
+                }}
                 className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                   viewMode === 'day'
                     ? 'bg-purple-500 text-white shadow-lg'
@@ -1002,7 +1010,10 @@ export default function TargetsPage() {
                 DAY
               </button>
               <button
-                onClick={() => setViewMode('week')}
+                onClick={() => {
+                  track('period_toggled', { from: viewMode, to: 'week', page: 'targets' });
+                  setViewMode('week');
+                }}
                 className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                   viewMode === 'week'
                     ? 'bg-purple-500 text-white shadow-lg'

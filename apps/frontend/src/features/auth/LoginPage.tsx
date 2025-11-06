@@ -1,6 +1,7 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLoginMutation } from './authApi';
+import { eventTracker } from '../../services/eventTracker';
 
 export default function LoginPage() {
   const [loginInput, setLoginInput] = useState('');
@@ -23,15 +24,32 @@ export default function LoginPage() {
       return;
     }
 
+    const loginMethod = isEmail(loginInput) ? 'email' : 'employee_id';
+    
     try {
       const loginData = isEmail(loginInput) 
         ? { email: loginInput, password }
         : { employee_id: loginInput, password };
       
-      await login(loginData).unwrap();
+      const result = await login(loginData).unwrap();
+      
+      // Track successful login
+      if (result.user?.employee_id) {
+        eventTracker.track('user_login', {
+          success: true,
+          method: loginMethod,
+          employee_id: result.user.employee_id
+        });
+      }
+      
       navigate('/', { replace: true });
     } catch (err: any) {
       console.error('Login error:', err);
+      
+      // Track failed login attempt (without setting employee_id)
+      const tempTracker = eventTracker;
+      const errorType = err?.data?.message || 'unknown';
+      
       if (err?.data?.message === 'Please verify your email') {
         setFormError('Please check your email and verify your account before logging in');
       } else if (err?.data?.message === 'Invalid credentials') {
