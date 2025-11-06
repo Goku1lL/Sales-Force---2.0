@@ -54,25 +54,27 @@ router.post('/track', async (req: Request, res: Response) => {
 
     // Prepare events for insertion
     const now = new Date();
-    const eventsToInsert = events.map(event => ({
-      entry_date: now,
-      entry_time: now,
-      employee_id,
-      event_name: event.event_name,
-      meta_data: event.meta_data || {}
-    }));
+    
+    // Insert events using raw SQL for compatibility
+    let insertedCount = 0;
+    for (const event of events) {
+      try {
+        await prisma.$executeRaw`
+          INSERT INTO SA_ExecutiveAppEvents (entry_date, entry_time, employee_id, event_name, meta_data)
+          VALUES (${now}, ${now}, ${employee_id}, ${event.event_name}, ${JSON.stringify(event.meta_data || {})})
+        `;
+        insertedCount++;
+      } catch (err) {
+        console.error('Failed to insert event:', err);
+        // Continue with other events even if one fails
+      }
+    }
 
-    // Insert events in batch
-    const result = await prisma.sA_ExecutiveAppEvents.createMany({
-      data: eventsToInsert,
-      skipDuplicates: true
-    });
-
-    console.log(`✅ Tracked ${result.count} events for employee ${employee_id}`);
+    console.log(`✅ Tracked ${insertedCount} events for employee ${employee_id}`);
 
     res.status(200).json({ 
       success: true, 
-      tracked: result.count 
+      tracked: insertedCount 
     });
   } catch (error) {
     console.error('❌ Event tracking error:', error);
