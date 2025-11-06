@@ -33,6 +33,11 @@ try {
       refreshToken: parsed.refreshToken ?? null,
       user: parsed.user ?? null,
     } as AuthState;
+    
+    // Initialize event tracking if user is already logged in
+    if (initialState.user?.employee_id) {
+      eventTracker.setEmployee(initialState.user.employee_id);
+    }
   }
 } catch {}
 

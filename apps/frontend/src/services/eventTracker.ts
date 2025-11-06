@@ -57,6 +57,7 @@ class EventTracker {
    */
   setEmployee(employeeId: string) {
     this.employeeId = employeeId;
+    console.log(`📊 Event tracking initialized for employee: ${employeeId}`);
   }
 
   /**
@@ -73,7 +74,7 @@ class EventTracker {
   track(eventName: string, metadata?: Record<string, any>) {
     // Don't track without employee context
     if (!this.employeeId) {
-      console.debug('Event tracking: No employee ID set, skipping event:', eventName);
+      console.debug('⚠️ Event tracking: No employee ID set, skipping event:', eventName);
       return;
     }
     
@@ -89,6 +90,7 @@ class EventTracker {
     };
 
     this.eventQueue.push(event);
+    console.log(`📊 Event queued: ${eventName} (queue: ${this.eventQueue.length}/${this.maxQueueSize})`);
 
     // Flush if queue is full
     if (this.eventQueue.length >= this.maxQueueSize) {
@@ -110,26 +112,33 @@ class EventTracker {
       events: eventsToSend
     };
 
+    console.log(`📤 Flushing ${eventsToSend.length} events to ${this.backendUrl}/events/track`);
+
     try {
       if (synchronous) {
         // Use sendBeacon for unload events (guaranteed delivery)
         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        navigator.sendBeacon(`${this.backendUrl}/events/track`, blob);
+        const sent = navigator.sendBeacon(`${this.backendUrl}/events/track`, blob);
+        console.log(`📡 sendBeacon result: ${sent ? 'success' : 'failed'}`);
       } else {
         // Regular async request (fire and forget)
-        fetch(`${this.backendUrl}/events/track`, {
+        const response = await fetch(`${this.backendUrl}/events/track`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           // Don't set keepalive to avoid blocking
-        }).catch(err => {
-          // Silently fail - tracking should never break the app
-          console.debug('Event tracking failed:', err);
         });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ Events sent successfully:`, result);
+        } else {
+          console.warn(`⚠️ Event tracking response: ${response.status} ${response.statusText}`);
+        }
       }
     } catch (error) {
       // Silently fail - tracking should never break the app
-      console.debug('Event tracking error:', error);
+      console.warn('❌ Event tracking failed:', error);
     }
   }
 

@@ -38,10 +38,13 @@ interface BatchEventRequest {
  */
 router.post('/track', async (req: Request, res: Response) => {
   try {
+    console.log('📊 Received event tracking request:', JSON.stringify(req.body, null, 2));
+    
     const { employee_id, events } = req.body as BatchEventRequest;
     
     // Validate payload
     if (!employee_id || !events || !Array.isArray(events)) {
+      console.error('❌ Invalid event tracking payload:', { employee_id, events: Array.isArray(events) });
       return res.status(400).json({ 
         success: false, 
         error: 'Invalid payload. Expected { employee_id: string, events: array }' 
@@ -49,6 +52,7 @@ router.post('/track', async (req: Request, res: Response) => {
     }
 
     if (events.length === 0) {
+      console.log('⚠️ No events to track');
       return res.status(200).json({ success: true, tracked: 0 });
     }
 
