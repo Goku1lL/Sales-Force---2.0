@@ -14,6 +14,10 @@ export const customersApi = api.injectEndpoints({
       query: (employeeId) => `/customers/high-value/${employeeId}`,
       transformResponse: (resp: any) => resp?.data ?? [],
     }),
+    getCustomerPageCustomers: builder.query<any[], string>({
+      query: (employeeId) => `/customers/customer-page/${employeeId}`,
+      transformResponse: (resp: any) => resp?.data ?? [],
+    }),
   }),
 });
 
@@ -21,4 +25,5 @@ export const {
   useGetAssignedCustomersQuery,
   useGetInactiveCustomersQuery,
   useGetHighValueCustomersQuery,
+  useGetCustomerPageCustomersQuery,
 } = customersApi;

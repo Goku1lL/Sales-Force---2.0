@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../app/store';
 import { useGetSummaryQuery, useGetUrgentActionsQuery, useGetNearbyOpportunitiesQuery } from './dashboardApi';
 import { useGetUserProfileQuery, useGetClusterLeaderboardQuery, useGetCityLeaderboardQuery, useGetEmployeeDetailsQuery } from '../leaderboard/leaderboardApi';
-import { useGetAssignedCustomersQuery, useGetInactiveCustomersQuery, useGetHighValueCustomersQuery } from '../customers/customersApi';
-import { CUSTOMER_TAB_LABELS } from '../customers/customerConstants';
+import { useGetAssignedCustomersQuery, useGetInactiveCustomersQuery, useGetHighValueCustomersQuery, useGetCustomerPageCustomersQuery } from '../customers/customersApi';
 import { CustomerCard } from '../customers/CustomerCard';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemedCard, ThemedBadge, ThemedProgress } from '../../shared';
@@ -178,6 +177,66 @@ export default function DashboardPage() {
   const { data: priorityCustomers, isLoading: priorityLoading } = useGetHighValueCustomersQuery(employeeId || '', { skip: !employeeId });
   const { data: assignedCustomers, isLoading: assignedLoading } = useGetAssignedCustomersQuery(employeeId || '', { skip: !employeeId });
   const { data: inactiveCustomers, isLoading: inactiveLoading } = useGetInactiveCustomersQuery(employeeId || '', { skip: !employeeId });
+  const { data: customerPageCustomers, isLoading: customerPageLoading } = useGetCustomerPageCustomersQuery(employeeId || '', { skip: !employeeId });
+
+  // Group customers by description (same logic as CustomersPage)
+  const groupedCustomers = useMemo(() => {
+    const groups: Record<string, { customers: any[]; source: 'assigned' | 'inactive' | 'high' | 'customerPage' }> = {};
+    const seenKeys = new Set<string>();
+
+    // Process in priority order: assigned > high > inactive > customerPage
+    const allCustomers = [
+      ...(assignedCustomers ?? []).map(c => ({ ...c, _source: 'assigned' })),
+      ...(priorityCustomers ?? []).map(c => ({ ...c, _source: 'high' })),
+      ...(inactiveCustomers ?? []).map(c => ({ ...c, _source: 'inactive' })),
+      ...(customerPageCustomers ?? []).map(c => ({ ...c, _source: 'customerPage' }))
+    ];
+
+    allCustomers.forEach((customer: any) => {
+      const desc = customer.description || 'Uncategorized';
+      
+      // Create unique key: use customer_id + description for customerPage, Id for others
+      const uniqueKey = customer._source === 'customerPage' && customer.customer_id
+        ? `${customer.customer_id}_${desc}`
+        : `${customer.Id}_${desc}`;
+      
+      if (seenKeys.has(uniqueKey)) return;
+      seenKeys.add(uniqueKey);
+      
+      if (!groups[desc]) {
+        groups[desc] = { customers: [], source: customer._source };
+      }
+      const { _source, ...cleanCustomer } = customer;
+      groups[desc].customers.push(cleanCustomer);
+    });
+
+    // Sort each group by time/date fields (most recent first)
+    Object.keys(groups).forEach(desc => {
+      groups[desc].customers.sort((a: any, b: any) => {
+        // For SA_CustomerPageCustomers, sort by date (most recent first)
+        if (a.date && b.date) {
+          const dateA = new Date(a.date).getTime();
+          const dateB = new Date(b.date).getTime();
+          return dateB - dateA; // DESC: most recent first
+        }
+        
+        // For LastOpened (hours ago - lower is more recent)
+        if (a.LastOpened !== undefined && b.LastOpened !== undefined) {
+          return a.LastOpened - b.LastOpened; // ASC: lower hours = more recent
+        }
+        
+        // For LastOrder (days ago - lower is more recent)
+        if (a.LastOrder !== undefined && b.LastOrder !== undefined) {
+          return a.LastOrder - b.LastOrder; // ASC: lower days = more recent
+        }
+        
+        // Fallback: maintain original order
+        return 0;
+      });
+    });
+
+    return groups;
+  }, [assignedCustomers, priorityCustomers, inactiveCustomers, customerPageCustomers]);
 
   // Live activity with client-side polling
   const { activities: liveActivities, isLoading: liveActivityLoading } = useLiveActivity();
@@ -897,12 +956,16 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Eligibility Warning Banner */}
+        {/* Eligibility Warning Banner - Show regardless of day/week toggle */}
         {(() => {
-          const eligibilityStatus = viewMode === 'day' 
-            ? summary?.data?.dailyEligibilityStatus 
-            : summary?.data?.weeklyEligibilityStatus;
+          // Check both daily and weekly eligibility, prioritize weekly (since NOB is weekly)
+          const weeklyEligibility = summary?.data?.weeklyEligibilityStatus;
+          const dailyEligibility = summary?.data?.dailyEligibilityStatus;
           
+          // Use weekly eligibility if available, otherwise fall back to daily
+          const eligibilityStatus = weeklyEligibility || dailyEligibility;
+          
+          // Show alert if either status indicates not eligible
           if (eligibilityStatus && !eligibilityStatus.isEligible) {
             return (
               <div className={`mb-6 p-4 rounded-lg border-2 ${
@@ -1112,58 +1175,31 @@ export default function DashboardPage() {
               </ThemedCard>
             )}
 
-            {/* Customer Cards - Desktop grid layout - Show available cards first */}
-            {(assignedCustomers?.length > 0 || inactiveCustomers?.length > 0 || priorityCustomers?.length > 0) && (
+            {/* Customer Cards - Desktop grid layout - Grouped by description */}
+            {Object.keys(groupedCustomers).length > 0 && (
               <div className="mt-6 hidden lg:block">
                 <div className="space-y-6">
-                  {/* Collect all available customer cards */}
+                  {/* Collect all available customer cards grouped by description */}
                   {(() => {
-                    const availableCards = [];
-                    
-                    if (assignedCustomers && assignedCustomers.length > 0) {
-                      availableCards.push(
-                        <div key="assigned">
+                    const descriptions = Object.keys(groupedCustomers).sort();
+                    const availableCards = descriptions.map((desc) => {
+                      const group = groupedCustomers[desc];
+                      const customers = group.customers.slice(0, 3);
+                      const isLoading = assignedLoading || inactiveLoading || priorityLoading || customerPageLoading;
+                      
+                      return (
+                        <div key={desc}>
                           <CustomerCard
-                            customers={assignedCustomers.slice(0, 3)}
-                            title={`${CUSTOMER_TAB_LABELS.assigned} (${assignedCustomers.length})`}
-                            isLoading={assignedLoading}
+                            customers={customers}
+                            title={`${desc} (${group.customers.length})`}
+                            isLoading={isLoading}
                             showDescription={false}
                             showLastOrder={true}
-                            tabType="assigned"
-                          />
-                </div>
-                      );
-                    }
-                    
-                    if (inactiveCustomers && inactiveCustomers.length > 0) {
-                      availableCards.push(
-                        <div key="inactive">
-                          <CustomerCard
-                            customers={inactiveCustomers.slice(0, 3)}
-                            title={`${CUSTOMER_TAB_LABELS.inactive} (${inactiveCustomers.length})`}
-                            isLoading={inactiveLoading}
-                            showDescription={false}
-                            showLastOrder={true}
-                            tabType="inactive"
-                          />
-              </div>
-                      );
-                    }
-                    
-                    if (priorityCustomers && priorityCustomers.length > 0) {
-                      availableCards.push(
-                        <div key="high">
-                          <CustomerCard
-                            customers={priorityCustomers.slice(0, 3)}
-                            title={`${CUSTOMER_TAB_LABELS.high} (${priorityCustomers.length})`}
-                            isLoading={priorityLoading}
-                            showDescription={false}
-                            showLastOrder={true}
-                            tabType="high"
+                            tabType={group.source}
                           />
                         </div>
                       );
-                    }
+                    });
 
                     // Render in a dynamic grid based on number of available cards
                     if (availableCards.length === 1) {
@@ -1171,15 +1207,17 @@ export default function DashboardPage() {
                     } else if (availableCards.length === 2) {
                       return <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{availableCards}</div>;
                     } else {
-                      // Three cards: 2 in first row, 1 in second
+                      // Three or more cards: 2 in first row, rest in second
                       return (
                         <>
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {availableCards.slice(0, 2)}
                           </div>
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {availableCards.slice(2)}
-                          </div>
+                          {availableCards.length > 2 && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {availableCards.slice(2)}
+                            </div>
+                          )}
                         </>
                       );
                     }
@@ -1475,47 +1513,28 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Customer Cards - Mobile view (below leaderboard) */}
-            {/* Target Customers Card */}
-            {assignedCustomers && assignedCustomers.length > 0 && (
-              <div className="mt-6 lg:hidden">
-                <CustomerCard
-                  customers={assignedCustomers.slice(0, 5)}
-                  title={`${CUSTOMER_TAB_LABELS.assigned} (${assignedCustomers.length})`}
-                  isLoading={assignedLoading}
-                  showDescription={false}
-                  showLastOrder={true}
-                  tabType="assigned"
-                />
-          </div>
-            )}
-
-            {/* App Funnel Card */}
-            {inactiveCustomers && inactiveCustomers.length > 0 && (
-              <div className="mt-6 lg:hidden">
-                <CustomerCard
-                  customers={inactiveCustomers.slice(0, 5)}
-                  title={`${CUSTOMER_TAB_LABELS.inactive} (${inactiveCustomers.length})`}
-                  isLoading={inactiveLoading}
-                  showDescription={false}
-                  showLastOrder={true}
-                  tabType="inactive"
-                />
-        </div>
-            )}
-
-            {/* Priority Customers Card */}
-            {priorityCustomers && priorityCustomers.length > 0 && (
-              <div className="mt-6 lg:hidden">
-                <CustomerCard
-                  customers={priorityCustomers.slice(0, 5)}
-                  title={`${CUSTOMER_TAB_LABELS.high} (${priorityCustomers.length})`}
-                  isLoading={priorityLoading}
-                  showDescription={false}
-                  showLastOrder={true}
-                  tabType="high"
-                />
-              </div>
+            {/* Customer Cards - Mobile - Grouped by description */}
+            {Object.keys(groupedCustomers).length > 0 && (
+              <>
+                {Object.keys(groupedCustomers).sort().map((desc) => {
+                  const group = groupedCustomers[desc];
+                  const customers = group.customers.slice(0, 5);
+                  const isLoading = assignedLoading || inactiveLoading || priorityLoading || customerPageLoading;
+                  
+                  return (
+                    <div key={desc} className="mt-6 lg:hidden">
+                      <CustomerCard
+                        customers={customers}
+                        title={`${desc} (${group.customers.length})`}
+                        isLoading={isLoading}
+                        showDescription={false}
+                        showLastOrder={true}
+                        tabType={group.source}
+                      />
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         </div>

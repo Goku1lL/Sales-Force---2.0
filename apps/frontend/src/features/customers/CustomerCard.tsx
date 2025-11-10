@@ -6,8 +6,8 @@ interface Customer {
   description?: string;
   Priority?: number;
   contactnumber?: string | number;
-  LastOrder?: number;
-  LastOpened?: string | Date;
+  LastOrder?: number; // Days since last order
+  LastOpened?: number; // Hours since last opened (from SA_HomePageAppFunnelCustomers)
 }
 
 interface CustomerCardProps {
@@ -44,6 +44,24 @@ export function CustomerCard({
     if (diffMins < 60) return `${diffMins} min ago`;
     if (diffHours < 24) return `${diffHours} hr ago`;
     return `${diffDays} days ago`;
+  };
+
+  const formatHoursAgo = (hours: number | null | undefined) => {
+    if (hours === null || hours === undefined) return 'Unknown';
+    const hoursNum = typeof hours === 'number' ? hours : parseFloat(String(hours));
+    if (isNaN(hoursNum)) return 'Invalid';
+    
+    // LastOpened is already in hours, so format it appropriately
+    if (hoursNum < 1) {
+      const mins = Math.floor(hoursNum * 60);
+      return mins <= 1 ? '1 min ago' : `${mins} mins ago`;
+    } else if (hoursNum < 24) {
+      const wholeHours = Math.floor(hoursNum);
+      return wholeHours === 1 ? '1 hr ago' : `${wholeHours} hrs ago`;
+    } else {
+      const days = Math.floor(hoursNum / 24);
+      return days === 1 ? '1 day ago' : `${days} days ago`;
+    }
   };
 
   const formatDaysAgo = (days: number | null | undefined) => {
@@ -150,7 +168,7 @@ export function CustomerCard({
                   )}
                   
                   {/* Last Order/Opened Time */}
-                  {showLastOrder && (r.LastOrder !== undefined || r.LastOpened) && (
+                  {showLastOrder && (r.LastOrder !== undefined || r.LastOpened !== undefined) && (
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <span className="font-medium">
                         {tabType === 'assigned' || tabType === 'high' ? 'Last Order:' : 'Last Opened:'}
@@ -158,7 +176,7 @@ export function CustomerCard({
                       <span>
                         {tabType === 'assigned' || tabType === 'high'
                           ? formatDaysAgo(r.LastOrder)
-                          : formatTimeAgo(r.LastOpened)
+                          : formatHoursAgo(r.LastOpened)
                         }
                       </span>
                     </div>

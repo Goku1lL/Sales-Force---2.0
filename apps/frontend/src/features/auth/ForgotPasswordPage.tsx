@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
       // Note: We can't track with employee_id since user isn't logged in
       // This is tracked at page-level without employee context
       
-      setStatus(data.message || 'If the email exists, a reset link has been sent');
+    setStatus(data.message || 'If the email exists, a reset link has been sent');
     } catch (err: any) {
       console.error('Network error:', err);
       setStatus(`Network error: ${err.message || 'Please check your connection and try again.'}`);
